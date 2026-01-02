@@ -2,7 +2,7 @@ pub mod status_bar;
 pub mod todo_list;
 
 use crate::app::AppState;
-use crate::utils::unicode::{char_count, truncate_chars};
+
 use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
     style::Style,
@@ -25,47 +25,9 @@ pub fn render(f: &mut Frame, state: &AppState) {
     // Render status bar
     status_bar::render(f, state, chunks[1]);
 
-    // Render help overlay if active
     if state.show_help {
         render_help_overlay(f, state);
     }
-
-    // Render delete confirmation overlay
-    if state.confirm_delete {
-        render_delete_confirm(f, state);
-    }
-}
-
-fn render_delete_confirm(f: &mut Frame, state: &AppState) {
-    let item_text = state
-        .selected_item()
-        .map(|item| item.content.as_str())
-        .unwrap_or("");
-    
-    let truncated = if char_count(item_text) > 40 {
-        format!("{}...", truncate_chars(item_text, 37))
-    } else {
-        item_text.to_string()
-    };
-
-    let area = centered_rect(50, 20, f.area());
-
-    let block = Block::default()
-        .borders(Borders::ALL)
-        .title(" Delete Item? ")
-        .style(Style::default().bg(state.theme.background));
-
-    let text = format!(
-        "\n  \"{}\"\n\n  Press Enter or Y to delete\n  Press N or Esc to cancel",
-        truncated
-    );
-
-    let paragraph = Paragraph::new(text)
-        .block(block)
-        .style(Style::default().fg(state.theme.foreground));
-
-    f.render_widget(Clear, area);
-    f.render_widget(paragraph, area);
 }
 
 fn render_help_overlay(f: &mut Frame, state: &AppState) {
@@ -79,19 +41,18 @@ fn render_help_overlay(f: &mut Frame, state: &AppState) {
       Alt/Option+Shift+↑/↓  Move item with children
       Alt/Option+Shift+←/→  Indent/outdent with children
       Tab / Shift+Tab       Indent/outdent single item
-      i or Enter            Edit current item
-      Shift+Enter           New item at same level
-      n                     New item below
-      d                     Delete item (confirms)
+      i                     Enter Insert mode
+      Enter / n             New item
+      dd                    Delete item
+      c                     Collapse/expand children
       u                     Undo
       ?                     Toggle help
       Esc                   Close help
       q                     Quit (or close help)
 
-    Edit Mode:
-      Esc                   Cancel edit
-      Enter                 Save and exit to Navigate
-      Shift+Enter           Save and create new item
+    Insert Mode:
+      Esc                   Save and exit to Navigate
+      Enter                 Save and create new item
       Tab / Shift+Tab       Indent/outdent item
       ←/→                   Move cursor
       Home/End              Jump to start/end

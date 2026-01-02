@@ -14,17 +14,16 @@ pub fn handle_key_event(key: KeyEvent, state: &mut AppState) -> Result<()> {
 }
 
 fn handle_navigate_mode(key: KeyEvent, state: &mut AppState) -> Result<()> {
-    if state.confirm_delete {
-        match key.code {
-            KeyCode::Enter | KeyCode::Char('y') | KeyCode::Char('Y') => {
-                state.confirm_delete = false;
+    if state.awaiting_second_d {
+        state.awaiting_second_d = false;
+        if key.code == KeyCode::Char('d') && key.modifiers == KeyModifiers::NONE {
+            if !state.todo_list.items.is_empty() {
                 state.save_undo();
                 delete_current_item(state)?;
+                save_todo_list(&state.todo_list)?;
+                state.unsaved_changes = false;
+                state.last_save_time = Some(std::time::Instant::now());
             }
-            KeyCode::Char('n') | KeyCode::Char('N') | KeyCode::Esc => {
-                state.confirm_delete = false;
-            }
-            _ => {}
         }
         return Ok(());
     }
@@ -111,8 +110,7 @@ fn handle_navigate_mode(key: KeyEvent, state: &mut AppState) -> Result<()> {
             }
         }
 
-        // Enter edit mode
-        (KeyCode::Char('i'), KeyModifiers::NONE) | (KeyCode::Enter, KeyModifiers::NONE) => {
+        (KeyCode::Char('i'), KeyModifiers::NONE) => {
             enter_edit_mode(state);
         }
 
@@ -121,10 +119,18 @@ fn handle_navigate_mode(key: KeyEvent, state: &mut AppState) -> Result<()> {
             new_item_below(state);
         }
 
-        // Delete item
         (KeyCode::Char('d'), KeyModifiers::NONE) => {
             if !state.todo_list.items.is_empty() {
-                state.confirm_delete = true;
+                state.awaiting_second_d = true;
+            }
+        }
+
+        (KeyCode::Char('c'), KeyModifiers::NONE) => {
+            if state.todo_list.has_children(state.cursor_position) {
+                if let Some(item) = state.todo_list.items.get_mut(state.cursor_position) {
+                    item.collapsed = !item.collapsed;
+                    state.unsaved_changes = true;
+                }
             }
         }
 
@@ -156,8 +162,7 @@ fn handle_navigate_mode(key: KeyEvent, state: &mut AppState) -> Result<()> {
             }
         }
 
-        // Shift+Enter in Navigate mode: create new item at same level
-        (KeyCode::Enter, mods) if mods.contains(KeyModifiers::SHIFT) => {
+        (KeyCode::Enter, _) => {
             new_item_at_same_level(state);
         }
 
@@ -177,21 +182,12 @@ fn handle_navigate_mode(key: KeyEvent, state: &mut AppState) -> Result<()> {
 fn handle_edit_mode(key: KeyEvent, state: &mut AppState) -> Result<()> {
     match (key.code, key.modifiers) {
         (KeyCode::Esc, _) => {
-            // Cancel edit
-            state.mode = Mode::Navigate;
-            state.edit_buffer.clear();
-            state.edit_cursor_pos = 0;
-            state.is_creating_new_item = false;
-        }
-        (KeyCode::Enter, mods) if mods.contains(KeyModifiers::SHIFT) => {
-            // Shift+Enter: Save and create new item at same level
             save_edit_buffer(state)?;
-            new_item_at_same_level(state);
+            state.mode = Mode::Navigate;
         }
         (KeyCode::Enter, _) => {
-            // Regular Enter: Save edit and return to Navigate
             save_edit_buffer(state)?;
-            state.mode = Mode::Navigate;
+            new_item_at_same_level(state);
         }
         (KeyCode::Backspace, _) => {
             if state.edit_cursor_pos > 0 {

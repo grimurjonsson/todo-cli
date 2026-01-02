@@ -131,6 +131,7 @@ fn parse_todo_line(line: &str) -> Result<Option<TodoItem>> {
         None,
         due_date,
         None,
+        false,
     );
     
     if let Some(parsed_id) = id {

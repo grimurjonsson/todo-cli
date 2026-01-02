@@ -10,7 +10,7 @@ impl fmt::Display for Mode {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Mode::Navigate => write!(f, "NAVIGATE"),
-            Mode::Edit => write!(f, "EDIT"),
+            Mode::Edit => write!(f, "INSERT"),
         }
     }
 }

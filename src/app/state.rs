@@ -22,7 +22,7 @@ pub struct AppState {
     pub is_creating_new_item: bool,
     pub pending_indent_level: usize,
     pub undo_stack: Vec<(TodoList, usize)>,
-    pub confirm_delete: bool,
+    pub awaiting_second_d: bool,
 }
 
 impl AppState {
@@ -42,7 +42,7 @@ impl AppState {
             is_creating_new_item: false,
             pending_indent_level: 0,
             undo_stack: Vec::new(),
-            confirm_delete: false,
+            awaiting_second_d: false,
         }
     }
 
@@ -67,13 +67,43 @@ impl AppState {
     pub fn move_cursor_up(&mut self) {
         if self.cursor_position > 0 {
             self.cursor_position -= 1;
+            while self.cursor_position > 0 && self.is_item_hidden(self.cursor_position) {
+                self.cursor_position -= 1;
+            }
         }
     }
 
     pub fn move_cursor_down(&mut self) {
         if !self.todo_list.items.is_empty() && self.cursor_position < self.todo_list.items.len() - 1 {
             self.cursor_position += 1;
+            while self.cursor_position < self.todo_list.items.len() - 1 
+                && self.is_item_hidden(self.cursor_position) {
+                self.cursor_position += 1;
+            }
+            if self.is_item_hidden(self.cursor_position) && self.cursor_position > 0 {
+                self.cursor_position -= 1;
+                while self.cursor_position > 0 && self.is_item_hidden(self.cursor_position) {
+                    self.cursor_position -= 1;
+                }
+            }
         }
+    }
+    
+    fn is_item_hidden(&self, index: usize) -> bool {
+        if index >= self.todo_list.items.len() {
+            return false;
+        }
+        let target_indent = self.todo_list.items[index].indent_level;
+        for i in (0..index).rev() {
+            let item = &self.todo_list.items[i];
+            if item.indent_level < target_indent {
+                if item.collapsed {
+                    return true;
+                }
+                break;
+            }
+        }
+        false
     }
 
     pub fn selected_item(&self) -> Option<&TodoItem> {

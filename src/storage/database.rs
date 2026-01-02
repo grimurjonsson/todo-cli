@@ -31,12 +31,18 @@ pub fn init_database() -> Result<()> {
             parent_id TEXT,
             due_date TEXT,
             description TEXT,
+            collapsed INTEGER NOT NULL DEFAULT 0,
             position INTEGER NOT NULL,
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL
         )",
         [],
     )?;
+    
+    conn.execute(
+        "ALTER TABLE todos ADD COLUMN collapsed INTEGER NOT NULL DEFAULT 0",
+        [],
+    ).ok();
     
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_todos_date ON todos(date)",
@@ -56,7 +62,7 @@ pub fn load_todos_for_date(date: NaiveDate) -> Result<Vec<TodoItem>> {
     let date_str = date.format("%Y-%m-%d").to_string();
     
     let mut stmt = conn.prepare(
-        "SELECT id, content, state, indent_level, parent_id, due_date, description 
+        "SELECT id, content, state, indent_level, parent_id, due_date, description, collapsed 
          FROM todos 
          WHERE date = ?1 
          ORDER BY position ASC"
@@ -70,13 +76,14 @@ pub fn load_todos_for_date(date: NaiveDate) -> Result<Vec<TodoItem>> {
         let parent_id_str: Option<String> = row.get(4)?;
         let due_date_str: Option<String> = row.get(5)?;
         let description: Option<String> = row.get(6)?;
+        let collapsed: i32 = row.get(7).unwrap_or(0);
         
-        Ok((id_str, content, state_str, indent_level, parent_id_str, due_date_str, description))
+        Ok((id_str, content, state_str, indent_level, parent_id_str, due_date_str, description, collapsed))
     })?;
     
     let mut result = Vec::new();
     for item in items {
-        let (id_str, content, state_str, indent_level, parent_id_str, due_date_str, description) = item?;
+        let (id_str, content, state_str, indent_level, parent_id_str, due_date_str, description, collapsed) = item?;
         
         let id = Uuid::parse_str(&id_str).unwrap_or_else(|_| Uuid::new_v4());
         let state = TodoState::from_char(state_str.chars().next().unwrap_or(' '))
@@ -90,6 +97,7 @@ pub fn load_todos_for_date(date: NaiveDate) -> Result<Vec<TodoItem>> {
         todo.parent_id = parent_id;
         todo.due_date = due_date;
         todo.description = description;
+        todo.collapsed = collapsed != 0;
         
         result.push(todo);
     }
@@ -105,8 +113,8 @@ pub fn save_todo_list(list: &TodoList) -> Result<()> {
     conn.execute("DELETE FROM todos WHERE date = ?1", [&date_str])?;
     
     let mut stmt = conn.prepare(
-        "INSERT INTO todos (id, date, content, state, indent_level, parent_id, due_date, description, position, created_at, updated_at)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)"
+        "INSERT INTO todos (id, date, content, state, indent_level, parent_id, due_date, description, collapsed, position, created_at, updated_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)"
     )?;
     
     for (position, item) in list.items.iter().enumerate() {
@@ -114,6 +122,7 @@ pub fn save_todo_list(list: &TodoList) -> Result<()> {
         let state_str = item.state.to_char().to_string();
         let parent_id_str = item.parent_id.map(|id| id.to_string());
         let due_date_str = item.due_date.map(|d| d.format("%Y-%m-%d").to_string());
+        let collapsed_int: i32 = if item.collapsed { 1 } else { 0 };
         
         stmt.execute(params![
             id_str,
@@ -124,6 +133,7 @@ pub fn save_todo_list(list: &TodoList) -> Result<()> {
             parent_id_str,
             due_date_str,
             item.description,
+            collapsed_int,
             position,
             now,
             now,

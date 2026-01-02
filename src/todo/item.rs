@@ -11,6 +11,7 @@ pub struct TodoItem {
     pub parent_id: Option<Uuid>,
     pub due_date: Option<NaiveDate>,
     pub description: Option<String>,
+    pub collapsed: bool,
 }
 
 impl TodoItem {
@@ -23,6 +24,7 @@ impl TodoItem {
             parent_id: None,
             due_date: None,
             description: None,
+            collapsed: false,
         }
     }
 
@@ -36,6 +38,7 @@ impl TodoItem {
             parent_id: None,
             due_date: None,
             description: None,
+            collapsed: false,
         }
     }
 
@@ -49,6 +52,7 @@ impl TodoItem {
             parent_id,
             due_date: None,
             description: None,
+            collapsed: false,
         }
     }
 
@@ -59,6 +63,7 @@ impl TodoItem {
         parent_id: Option<Uuid>,
         due_date: Option<NaiveDate>,
         description: Option<String>,
+        collapsed: bool,
     ) -> Self {
         Self {
             id: Uuid::new_v4(),
@@ -68,6 +73,7 @@ impl TodoItem {
             parent_id,
             due_date,
             description,
+            collapsed,
         }
     }
 

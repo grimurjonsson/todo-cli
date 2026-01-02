@@ -1,7 +1,29 @@
 use super::TodoList;
+use super::state::TodoState;
 use anyhow::{anyhow, Result};
 
 impl TodoList {
+    pub fn count_children_stats(&self, index: usize) -> (usize, usize) {
+        if index >= self.items.len() {
+            return (0, 0);
+        }
+        
+        let (_, end) = self.get_item_range(index).unwrap_or((index, index + 1));
+        let children = &self.items[index + 1..end];
+        
+        let completed = children.iter().filter(|item| item.state == TodoState::Checked).count();
+        let total = children.len();
+        
+        (completed, total)
+    }
+    
+    pub fn has_children(&self, index: usize) -> bool {
+        if index >= self.items.len() {
+            return false;
+        }
+        let (start, end) = self.get_item_range(index).unwrap_or((index, index + 1));
+        end > start + 1
+    }
     pub fn recalculate_parent_ids(&mut self) {
         for i in 0..self.items.len() {
             let indent_level = self.items[i].indent_level;

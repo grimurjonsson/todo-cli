@@ -8,23 +8,42 @@ use ratatui::{
     widgets::{Block, Borders, List, ListItem},
     Frame,
 };
+use std::collections::HashSet;
 
 pub fn render(f: &mut Frame, state: &AppState, area: Rect) {
     let mut items: Vec<ListItem> = Vec::new();
+    let hidden_indices = build_hidden_indices(state);
 
-    // Build the list of items, potentially inserting a placeholder for new item
     for (idx, item) in state.todo_list.items.iter().enumerate() {
+        if hidden_indices.contains(&idx) {
+            continue;
+        }
+        
         let indent = "  ".repeat(item.indent_level);
+        let has_children = state.todo_list.has_children(idx);
+        
+        let fold_icon = if has_children {
+            if item.collapsed { "▶ " } else { "▼ " }
+        } else {
+            "  "
+        };
+        
         let checkbox = format!("{}", item.state);
         
         let due_date_str = item.due_date
             .map(|d| format!(" [{}]", d.format("%Y-%m-%d")))
             .unwrap_or_default();
         
-        let content = format!("{}{} {}{}", indent, checkbox, item.content, due_date_str);
+        let collapse_indicator = if item.collapsed {
+            let (completed, total) = state.todo_list.count_children_stats(idx);
+            format!(" ({}/{})", completed, total)
+        } else {
+            String::new()
+        };
+        
+        let content = format!("{}{}{} {}{}{}", indent, fold_icon, checkbox, item.content, due_date_str, collapse_indicator);
 
         let style = if idx == state.cursor_position && state.mode != Mode::Edit {
-            // Highlight in Navigate mode, but preserve strikethrough for completed items
             let mut style = Style::default()
                 .fg(state.theme.cursor)
                 .add_modifier(Modifier::REVERSED);
@@ -56,7 +75,6 @@ pub fn render(f: &mut Frame, state: &AppState, area: Rect) {
             items.push(ListItem::new(Line::from(Span::styled(desc_content, desc_style))));
         }
 
-        // If creating a new item and we just rendered the current item, insert placeholder
         if state.is_creating_new_item && state.mode == Mode::Edit && idx == state.cursor_position {
             let indent = "  ".repeat(state.pending_indent_level);
             let prefix = format!("{}[ ] ", indent);
@@ -237,4 +255,26 @@ fn render_edit_input(f: &mut Frame, state: &AppState, area: Rect) {
     let edit_line = Line::from(spans);
 
     f.render_widget(edit_line, edit_area);
+}
+
+fn build_hidden_indices(state: &AppState) -> HashSet<usize> {
+    let mut hidden = HashSet::new();
+    let items = &state.todo_list.items;
+    
+    let mut i = 0;
+    while i < items.len() {
+        if items[i].collapsed {
+            let base_indent = items[i].indent_level;
+            let mut j = i + 1;
+            while j < items.len() && items[j].indent_level > base_indent {
+                hidden.insert(j);
+                j += 1;
+            }
+            i = j;
+        } else {
+            i += 1;
+        }
+    }
+    
+    hidden
 }
