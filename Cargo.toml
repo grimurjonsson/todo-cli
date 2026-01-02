@@ -3,6 +3,18 @@ name = "todo-cli"
 version = "0.1.0"
 edition = "2021"
 
+[lib]
+name = "todo_cli"
+path = "src/lib.rs"
+
+[[bin]]
+name = "todo"
+path = "src/main.rs"
+
+[[bin]]
+name = "todo-mcp"
+path = "src/bin/todo-mcp.rs"
+
 [dependencies]
 ratatui = "0.29"
 crossterm = "0.28"
@@ -22,6 +34,9 @@ tower-http = { version = "0.6", features = ["cors", "trace"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 notify = "7.0"
+unicode-width = "0.2"
+rmcp = { version = "0.12", features = ["server", "transport-io"] }
+schemars = "1"
 
 [dev-dependencies]
 tempfile = "3.13"

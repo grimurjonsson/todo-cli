@@ -12,7 +12,6 @@ pub struct AppState {
     pub todo_list: TodoList,
     pub cursor_position: usize,
     pub mode: Mode,
-    pub scroll_offset: usize,
     pub edit_buffer: String,
     pub edit_cursor_pos: usize,
     pub should_quit: bool,
@@ -27,6 +26,7 @@ pub struct AppState {
     pub is_creating_new_item: bool,
     pub pending_indent_level: usize,
     pub undo_stack: Vec<(TodoList, usize)>,
+    pub selection_anchor: Option<usize>,
 }
 
 impl AppState {
@@ -35,7 +35,6 @@ impl AppState {
             todo_list,
             cursor_position: 0,
             mode: Mode::Navigate,
-            scroll_offset: 0,
             edit_buffer: String::new(),
             edit_cursor_pos: 0,
             should_quit: false,
@@ -50,6 +49,7 @@ impl AppState {
             is_creating_new_item: false,
             pending_indent_level: 0,
             undo_stack: Vec::new(),
+            selection_anchor: None,
         }
     }
 
@@ -126,6 +126,54 @@ impl AppState {
             self.cursor_position = self.cursor_position.min(self.todo_list.items.len() - 1);
         } else {
             self.cursor_position = 0;
+        }
+    }
+
+    pub fn clear_selection(&mut self) {
+        self.selection_anchor = None;
+    }
+
+    pub fn start_or_extend_selection(&mut self) {
+        if self.selection_anchor.is_none() {
+            self.selection_anchor = Some(self.cursor_position);
+        }
+    }
+
+    pub fn get_selection_range(&self) -> Option<(usize, usize)> {
+        self.selection_anchor.map(|anchor| {
+            let start = anchor.min(self.cursor_position);
+            let end = anchor.max(self.cursor_position);
+            (start, end)
+        })
+    }
+
+    pub fn is_selected(&self, index: usize) -> bool {
+        if let Some((start, end)) = self.get_selection_range() {
+            index >= start && index <= end
+        } else {
+            false
+        }
+    }
+
+    pub fn find_parent_index(&self, index: usize) -> Option<usize> {
+        if index >= self.todo_list.items.len() {
+            return None;
+        }
+        let target_indent = self.todo_list.items[index].indent_level;
+        if target_indent == 0 {
+            return None;
+        }
+        for i in (0..index).rev() {
+            if self.todo_list.items[i].indent_level < target_indent {
+                return Some(i);
+            }
+        }
+        None
+    }
+
+    pub fn move_to_parent(&mut self) {
+        if let Some(parent_idx) = self.find_parent_index(self.cursor_position) {
+            self.cursor_position = parent_idx;
         }
     }
 

@@ -10,6 +10,9 @@ timeoutlen = 1000
 "<Up>" = "move_up"
 "<Down>" = "move_down"
 
+# Visual mode (selection)
+"v" = "toggle_visual"
+
 # State changes
 "x" = "toggle_state"
 "<Space>" = "cycle_state"
@@ -24,7 +27,7 @@ timeoutlen = 1000
 
 # Indentation (single item)
 "<Tab>" = "indent"
-"<S-Tab>" = "outdent"
+"<BackTab>" = "outdent"
 
 # Indentation with children
 "<S-A-Right>" = "indent_with_children"
@@ -36,6 +39,10 @@ timeoutlen = 1000
 
 # Collapse/expand
 "c" = "toggle_collapse"
+"<Right>" = "expand"
+"l" = "expand"
+"<Left>" = "collapse_or_parent"
+"h" = "collapse_or_parent"
 
 # Undo
 "u" = "undo"
@@ -54,4 +61,16 @@ timeoutlen = 1000
 "<Home>" = "edit_home"
 "<End>" = "edit_end"
 "<Tab>" = "edit_indent"
-"<S-Tab>" = "edit_outdent"
+"<BackTab>" = "edit_outdent"
+
+[keybindings.visual]
+"k" = "move_up"
+"j" = "move_down"
+"<Up>" = "move_up"
+"<Down>" = "move_down"
+"<Tab>" = "indent"
+"<BackTab>" = "outdent"
+"u" = "undo"
+"v" = "exit_visual"
+"<Esc>" = "exit_visual"
+"q" = "exit_visual"

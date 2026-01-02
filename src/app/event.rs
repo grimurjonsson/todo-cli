@@ -9,6 +9,7 @@ use crossterm::event::{KeyCode, KeyEvent};
 pub fn handle_key_event(key: KeyEvent, state: &mut AppState) -> Result<()> {
     match state.mode {
         Mode::Navigate => handle_navigate_mode(key, state)?,
+        Mode::Visual => handle_visual_mode(key, state)?,
         Mode::Edit => handle_edit_mode(key, state)?,
     }
     Ok(())
@@ -50,11 +51,18 @@ fn handle_navigate_mode(key: KeyEvent, state: &mut AppState) -> Result<()> {
 fn execute_navigate_action(action: Action, state: &mut AppState) -> Result<()> {
     match action {
         Action::MoveUp => {
+            state.clear_selection();
             state.move_cursor_up();
         }
         Action::MoveDown => {
+            state.clear_selection();
             state.move_cursor_down();
         }
+        Action::ToggleVisual => {
+            state.start_or_extend_selection();
+            state.mode = Mode::Visual;
+        }
+        Action::ExitVisual => {}
         Action::ToggleState => {
             if state.selected_item().is_some() {
                 state.save_undo();
@@ -92,32 +100,56 @@ fn execute_navigate_action(action: Action, state: &mut AppState) -> Result<()> {
             enter_edit_mode(state);
         }
         Action::Indent => {
-            if state.todo_list.indent_item(state.cursor_position).is_ok() {
+            if let Some((start, end)) = state.get_selection_range() {
+                state.save_undo();
+                for idx in start..=end {
+                    let _ = state.todo_list.indent_item(idx);
+                }
                 state.unsaved_changes = true;
+                state.clear_selection();
+            } else {
+                state.save_undo();
+                if state.todo_list.indent_item(state.cursor_position).is_ok() {
+                    state.unsaved_changes = true;
+                }
             }
         }
         Action::Outdent => {
-            if state.todo_list.outdent_item(state.cursor_position).is_ok() {
+            if let Some((start, end)) = state.get_selection_range() {
+                state.save_undo();
+                for idx in start..=end {
+                    let _ = state.todo_list.outdent_item(idx);
+                }
                 state.unsaved_changes = true;
+                state.clear_selection();
+            } else {
+                state.save_undo();
+                if state.todo_list.outdent_item(state.cursor_position).is_ok() {
+                    state.unsaved_changes = true;
+                }
             }
         }
         Action::IndentWithChildren => {
+            state.save_undo();
             if state.todo_list.indent_item_with_children(state.cursor_position).is_ok() {
                 state.unsaved_changes = true;
             }
         }
         Action::OutdentWithChildren => {
+            state.save_undo();
             if state.todo_list.outdent_item_with_children(state.cursor_position).is_ok() {
                 state.unsaved_changes = true;
             }
         }
         Action::MoveItemUp => {
+            state.save_undo();
             if let Ok(displacement) = state.todo_list.move_item_with_children_up(state.cursor_position) {
                 state.cursor_position = state.cursor_position.saturating_sub(displacement);
                 state.unsaved_changes = true;
             }
         }
         Action::MoveItemDown => {
+            state.save_undo();
             if let Ok(displacement) = state.todo_list.move_item_with_children_down(state.cursor_position) {
                 state.cursor_position = (state.cursor_position + displacement)
                     .min(state.todo_list.items.len().saturating_sub(1));
@@ -126,10 +158,43 @@ fn execute_navigate_action(action: Action, state: &mut AppState) -> Result<()> {
         }
         Action::ToggleCollapse => {
             if state.todo_list.has_children(state.cursor_position) {
+                state.save_undo();
                 if let Some(item) = state.todo_list.items.get_mut(state.cursor_position) {
                     item.collapsed = !item.collapsed;
                     state.unsaved_changes = true;
                 }
+            }
+        }
+        Action::Expand => {
+            let should_expand = state.todo_list.has_children(state.cursor_position)
+                && state.todo_list.items
+                    .get(state.cursor_position)
+                    .map(|item| item.collapsed)
+                    .unwrap_or(false);
+            
+            if should_expand {
+                state.save_undo();
+                if let Some(item) = state.todo_list.items.get_mut(state.cursor_position) {
+                    item.collapsed = false;
+                    state.unsaved_changes = true;
+                }
+            }
+        }
+        Action::CollapseOrParent => {
+            let has_children = state.todo_list.has_children(state.cursor_position);
+            let is_collapsed = state.todo_list.items
+                .get(state.cursor_position)
+                .map(|item| item.collapsed)
+                .unwrap_or(false);
+            
+            if has_children && !is_collapsed {
+                state.save_undo();
+                if let Some(item) = state.todo_list.items.get_mut(state.cursor_position) {
+                    item.collapsed = true;
+                    state.unsaved_changes = true;
+                }
+            } else {
+                state.move_to_parent();
             }
         }
         Action::Undo => {
@@ -151,6 +216,83 @@ fn execute_navigate_action(action: Action, state: &mut AppState) -> Result<()> {
                 state.show_help = false;
             } else {
                 state.should_quit = true;
+            }
+        }
+        _ => {}
+    }
+    Ok(())
+}
+
+fn handle_visual_mode(key: KeyEvent, state: &mut AppState) -> Result<()> {
+    if let Some(action) = state.keybindings.get_visual_action(&key) {
+        execute_visual_action(action, state)?;
+    }
+
+    if state.unsaved_changes {
+        save_todo_list(&state.todo_list)?;
+        state.unsaved_changes = false;
+        state.last_save_time = Some(std::time::Instant::now());
+    }
+
+    Ok(())
+}
+
+fn execute_visual_action(action: Action, state: &mut AppState) -> Result<()> {
+    match action {
+        Action::MoveUp => {
+            state.move_cursor_up();
+        }
+        Action::MoveDown => {
+            state.move_cursor_down();
+        }
+        Action::ToggleVisual | Action::ExitVisual | Action::CloseHelp => {
+            state.clear_selection();
+            state.mode = Mode::Navigate;
+        }
+        Action::Quit => {
+            state.clear_selection();
+            state.mode = Mode::Navigate;
+        }
+        Action::Undo => {
+            if state.undo() {
+                save_todo_list(&state.todo_list)?;
+                state.last_save_time = Some(std::time::Instant::now());
+            }
+        }
+        Action::Indent => {
+            if let Some((start, end)) = state.get_selection_range() {
+                let can_indent = if start == 0 {
+                    false
+                } else {
+                    let prev_indent = state.todo_list.items[start - 1].indent_level;
+                    let first_indent = state.todo_list.items[start].indent_level;
+                    first_indent <= prev_indent
+                };
+                
+                if can_indent {
+                    state.save_undo();
+                    for idx in start..=end {
+                        state.todo_list.items[idx].indent_level += 1;
+                    }
+                    state.todo_list.recalculate_parent_ids();
+                    state.unsaved_changes = true;
+                }
+            }
+        }
+        Action::Outdent => {
+            if let Some((start, end)) = state.get_selection_range() {
+                let can_outdent = state.todo_list.items[start].indent_level > 0;
+                
+                if can_outdent {
+                    state.save_undo();
+                    for idx in start..=end {
+                        if state.todo_list.items[idx].indent_level > 0 {
+                            state.todo_list.items[idx].indent_level -= 1;
+                        }
+                    }
+                    state.todo_list.recalculate_parent_ids();
+                    state.unsaved_changes = true;
+                }
             }
         }
         _ => {}

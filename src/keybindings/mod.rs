@@ -12,6 +12,10 @@ pub enum Action {
     MoveUp,
     MoveDown,
     
+    // Visual mode
+    ToggleVisual,
+    ExitVisual,
+    
     // Item manipulation
     ToggleState,
     CycleState,
@@ -36,6 +40,8 @@ pub enum Action {
     
     // Collapse/expand
     ToggleCollapse,
+    Expand,
+    CollapseOrParent,
     
     // Undo
     Undo,
@@ -62,6 +68,8 @@ impl fmt::Display for Action {
         let s = match self {
             Action::MoveUp => "move_up",
             Action::MoveDown => "move_down",
+            Action::ToggleVisual => "toggle_visual",
+            Action::ExitVisual => "exit_visual",
             Action::ToggleState => "toggle_state",
             Action::CycleState => "cycle_state",
             Action::Delete => "delete",
@@ -75,6 +83,8 @@ impl fmt::Display for Action {
             Action::MoveItemUp => "move_item_up",
             Action::MoveItemDown => "move_item_down",
             Action::ToggleCollapse => "toggle_collapse",
+            Action::Expand => "expand",
+            Action::CollapseOrParent => "collapse_or_parent",
             Action::Undo => "undo",
             Action::ToggleHelp => "toggle_help",
             Action::CloseHelp => "close_help",
@@ -100,6 +110,8 @@ impl FromStr for Action {
         match s.to_lowercase().as_str() {
             "move_up" => Ok(Action::MoveUp),
             "move_down" => Ok(Action::MoveDown),
+            "toggle_visual" => Ok(Action::ToggleVisual),
+            "exit_visual" => Ok(Action::ExitVisual),
             "toggle_state" => Ok(Action::ToggleState),
             "cycle_state" => Ok(Action::CycleState),
             "delete" => Ok(Action::Delete),
@@ -113,6 +125,8 @@ impl FromStr for Action {
             "move_item_up" => Ok(Action::MoveItemUp),
             "move_item_down" => Ok(Action::MoveItemDown),
             "toggle_collapse" => Ok(Action::ToggleCollapse),
+            "expand" => Ok(Action::Expand),
+            "collapse_or_parent" => Ok(Action::CollapseOrParent),
             "undo" => Ok(Action::Undo),
             "toggle_help" => Ok(Action::ToggleHelp),
             "close_help" => Ok(Action::CloseHelp),
@@ -143,9 +157,14 @@ impl KeyBinding {
     }
     
     pub fn from_event(event: &KeyEvent) -> Self {
+        let modifiers = if event.code == KeyCode::BackTab {
+            event.modifiers - KeyModifiers::SHIFT
+        } else {
+            event.modifiers
+        };
         Self {
             code: event.code,
-            modifiers: event.modifiers,
+            modifiers,
         }
     }
 }
@@ -301,6 +320,7 @@ fn parse_key_code(s: &str) -> Result<KeyCode, String> {
     match s_lower.as_str() {
         "space" => Ok(KeyCode::Char(' ')),
         "tab" => Ok(KeyCode::Tab),
+        "backtab" => Ok(KeyCode::BackTab),
         "enter" | "return" | "cr" => Ok(KeyCode::Enter),
         "esc" | "escape" => Ok(KeyCode::Esc),
         "bs" | "backspace" => Ok(KeyCode::Backspace),
@@ -339,6 +359,8 @@ pub struct KeybindingCache {
     navigate_sequence_starters: HashSet<KeyBinding>,
     
     edit_single: HashMap<KeyBinding, Action>,
+    
+    visual_single: HashMap<KeyBinding, Action>,
 }
 
 impl KeybindingCache {
@@ -372,11 +394,21 @@ impl KeybindingCache {
             }
         }
         
+        let mut visual_single = HashMap::new();
+        for (key_str, action_str) in &config.visual {
+            if let (Ok(seq), Ok(action)) = (key_str.parse::<KeySequence>(), action_str.parse::<Action>()) {
+                if seq.is_single() {
+                    visual_single.insert(seq.0[0], action);
+                }
+            }
+        }
+        
         Self {
             navigate_single,
             navigate_sequences,
             navigate_sequence_starters,
             edit_single,
+            visual_single,
         }
     }
     
@@ -410,6 +442,11 @@ impl KeybindingCache {
         let binding = KeyBinding::from_event(event);
         self.edit_single.get(&binding).copied()
     }
+    
+    pub fn get_visual_action(&self, event: &KeyEvent) -> Option<Action> {
+        let binding = KeyBinding::from_event(event);
+        self.visual_single.get(&binding).copied()
+    }
 }
 
 impl Default for KeybindingCache {
@@ -425,6 +462,9 @@ pub struct KeybindingsConfig {
     
     #[serde(default = "default_edit_bindings")]
     pub edit: HashMap<String, String>,
+    
+    #[serde(default = "default_visual_bindings")]
+    pub visual: HashMap<String, String>,
 }
 
 impl Default for KeybindingsConfig {
@@ -432,6 +472,7 @@ impl Default for KeybindingsConfig {
         Self {
             navigate: default_navigate_bindings(),
             edit: default_edit_bindings(),
+            visual: default_visual_bindings(),
         }
     }
 }
@@ -443,6 +484,7 @@ fn default_navigate_bindings() -> HashMap<String, String> {
     m.insert("j".to_string(), "move_down".to_string());
     m.insert("<Up>".to_string(), "move_up".to_string());
     m.insert("<Down>".to_string(), "move_down".to_string());
+    m.insert("v".to_string(), "toggle_visual".to_string());
     m.insert("x".to_string(), "toggle_state".to_string());
     m.insert("<Space>".to_string(), "cycle_state".to_string());
     m.insert("dd".to_string(), "delete".to_string());
@@ -450,12 +492,16 @@ fn default_navigate_bindings() -> HashMap<String, String> {
     m.insert("<Enter>".to_string(), "new_item_same_level".to_string());
     m.insert("i".to_string(), "enter_edit_mode".to_string());
     m.insert("<Tab>".to_string(), "indent".to_string());
-    m.insert("<S-Tab>".to_string(), "outdent".to_string());
+    m.insert("<BackTab>".to_string(), "outdent".to_string());
     m.insert("<S-A-Right>".to_string(), "indent_with_children".to_string());
     m.insert("<S-A-Left>".to_string(), "outdent_with_children".to_string());
     m.insert("<S-A-Up>".to_string(), "move_item_up".to_string());
     m.insert("<S-A-Down>".to_string(), "move_item_down".to_string());
     m.insert("c".to_string(), "toggle_collapse".to_string());
+    m.insert("<Right>".to_string(), "expand".to_string());
+    m.insert("l".to_string(), "expand".to_string());
+    m.insert("<Left>".to_string(), "collapse_or_parent".to_string());
+    m.insert("h".to_string(), "collapse_or_parent".to_string());
     m.insert("u".to_string(), "undo".to_string());
     m.insert("?".to_string(), "toggle_help".to_string());
     m.insert("<Esc>".to_string(), "close_help".to_string());
@@ -475,7 +521,24 @@ fn default_edit_bindings() -> HashMap<String, String> {
     m.insert("<Home>".to_string(), "edit_home".to_string());
     m.insert("<End>".to_string(), "edit_end".to_string());
     m.insert("<Tab>".to_string(), "edit_indent".to_string());
-    m.insert("<S-Tab>".to_string(), "edit_outdent".to_string());
+    m.insert("<BackTab>".to_string(), "edit_outdent".to_string());
+    
+    m
+}
+
+fn default_visual_bindings() -> HashMap<String, String> {
+    let mut m = HashMap::new();
+    
+    m.insert("k".to_string(), "move_up".to_string());
+    m.insert("j".to_string(), "move_down".to_string());
+    m.insert("<Up>".to_string(), "move_up".to_string());
+    m.insert("<Down>".to_string(), "move_down".to_string());
+    m.insert("<Tab>".to_string(), "indent".to_string());
+    m.insert("<BackTab>".to_string(), "outdent".to_string());
+    m.insert("u".to_string(), "undo".to_string());
+    m.insert("v".to_string(), "exit_visual".to_string());
+    m.insert("<Esc>".to_string(), "exit_visual".to_string());
+    m.insert("q".to_string(), "exit_visual".to_string());
     
     m
 }
