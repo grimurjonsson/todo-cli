@@ -1,0 +1,20 @@
+[package]
+name = "todo-cli"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+ratatui = "0.29"
+crossterm = "0.28"
+clap = { version = "4.5", features = ["derive"] }
+serde = { version = "1.0", features = ["derive"] }
+toml = "0.8"
+pulldown-cmark = "0.12"
+chrono = "0.4"
+uuid = { version = "1.11", features = ["v4"] }
+anyhow = "1.0"
+dirs = "5.0"
+
+[dev-dependencies]
+tempfile = "3.13"
+pretty_assertions = "1.4"
