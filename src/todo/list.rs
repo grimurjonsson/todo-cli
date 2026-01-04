@@ -87,7 +87,7 @@ impl TodoList {
         Ok(())
     }
 
-    pub fn delete_item(&mut self, index: usize) -> Result<TodoItem> {
+    pub fn remove_item(&mut self, index: usize) -> Result<TodoItem> {
         if index >= self.items.len() {
             return Err(anyhow!("Index out of bounds"));
         }
@@ -242,14 +242,14 @@ mod tests {
     }
 
     #[test]
-    fn test_delete_item() {
+    fn test_remove_item() {
         let mut list = create_test_list();
         list.add_item("Task 1".to_string());
         list.add_item("Task 2".to_string());
         list.add_item("Task 3".to_string());
 
-        let deleted = list.delete_item(1).unwrap();
-        assert_eq!(deleted.content, "Task 2");
+        let removed = list.remove_item(1).unwrap();
+        assert_eq!(removed.content, "Task 2");
         assert_eq!(list.items.len(), 2);
         assert_eq!(list.items[1].content, "Task 3");
     }

@@ -1,5 +1,5 @@
 use super::state::TodoState;
-use chrono::NaiveDate;
+use chrono::{DateTime, NaiveDate, Utc};
 use uuid::Uuid;
 
 #[derive(Debug, Clone)]
@@ -12,10 +12,15 @@ pub struct TodoItem {
     pub due_date: Option<NaiveDate>,
     pub description: Option<String>,
     pub collapsed: bool,
+    pub created_at: DateTime<Utc>,
+    pub modified_at: DateTime<Utc>,
+    pub completed_at: Option<DateTime<Utc>>,
+    pub deleted_at: Option<DateTime<Utc>>,
 }
 
 impl TodoItem {
     pub fn new(content: String, indent_level: usize) -> Self {
+        let now = Utc::now();
         Self {
             id: Uuid::new_v4(),
             content,
@@ -25,11 +30,21 @@ impl TodoItem {
             due_date: None,
             description: None,
             collapsed: false,
+            created_at: now,
+            modified_at: now,
+            completed_at: None,
+            deleted_at: None,
         }
     }
 
     #[cfg(test)]
     pub fn with_state(content: String, state: TodoState, indent_level: usize) -> Self {
+        let now = Utc::now();
+        let completed_at = if state == TodoState::Checked {
+            Some(now)
+        } else {
+            None
+        };
         Self {
             id: Uuid::new_v4(),
             content,
@@ -39,6 +54,10 @@ impl TodoItem {
             due_date: None,
             description: None,
             collapsed: false,
+            created_at: now,
+            modified_at: now,
+            completed_at,
+            deleted_at: None,
         }
     }
 
@@ -51,6 +70,12 @@ impl TodoItem {
         description: Option<String>,
         collapsed: bool,
     ) -> Self {
+        let now = Utc::now();
+        let completed_at = if state == TodoState::Checked {
+            Some(now)
+        } else {
+            None
+        };
         Self {
             id: Uuid::new_v4(),
             content,
@@ -60,15 +85,33 @@ impl TodoItem {
             due_date,
             description,
             collapsed,
+            created_at: now,
+            modified_at: now,
+            completed_at,
+            deleted_at: None,
         }
     }
 
     pub fn toggle_state(&mut self) {
+        let was_complete = self.state.is_complete();
         self.state = self.state.toggle();
+        self.update_completed_at(was_complete);
     }
 
     pub fn cycle_state(&mut self) {
+        let was_complete = self.state.is_complete();
         self.state = self.state.cycle();
+        self.update_completed_at(was_complete);
+    }
+
+    fn update_completed_at(&mut self, was_complete: bool) {
+        let is_complete = self.state.is_complete();
+        self.modified_at = Utc::now();
+        if is_complete && !was_complete {
+            self.completed_at = Some(Utc::now());
+        } else if !is_complete && was_complete {
+            self.completed_at = None;
+        }
     }
 
     pub fn is_complete(&self) -> bool {

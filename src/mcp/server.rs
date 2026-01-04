@@ -7,6 +7,7 @@ use rmcp::{
 };
 use tracing::{debug, error, info, warn};
 
+use crate::storage::database::soft_delete_todo;
 use crate::storage::file::{file_exists, load_todo_list, save_todo_list};
 use crate::storage::rollover::create_rolled_over_list;
 use crate::todo::{TodoItem, TodoList};
@@ -325,6 +326,12 @@ impl TodoMcpServer {
             .map_err(|e| format_error(McpErrorDetail::storage_error(e.to_string())))?;
 
         let deleted_count = end - start;
+
+        for item in &list.items[start..end] {
+            soft_delete_todo(item.id, date)
+                .map_err(|e| format_error(McpErrorDetail::storage_error(e.to_string())))?;
+        }
+
         list.items.drain(start..end);
         list.recalculate_parent_ids();
 

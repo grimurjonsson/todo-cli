@@ -1,7 +1,7 @@
 use super::mode::Mode;
 use super::state::AppState;
 use crate::keybindings::{Action, KeyBinding, KeyLookupResult};
-use crate::storage::save_todo_list;
+use crate::storage::{save_todo_list, soft_delete_todo};
 use crate::utils::unicode::{next_char_boundary, prev_char_boundary};
 use anyhow::Result;
 use crossterm::event::{KeyCode, KeyEvent};
@@ -425,9 +425,12 @@ fn delete_current_item(state: &mut AppState) -> Result<()> {
         return Ok(());
     }
 
-    state.todo_list.delete_item(state.cursor_position)?;
+    let item_id = state.todo_list.items[state.cursor_position].id;
+    let date = state.todo_list.date;
+
+    soft_delete_todo(item_id, date)?;
+    state.todo_list.remove_item(state.cursor_position)?;
     state.clamp_cursor();
-    state.unsaved_changes = true;
     Ok(())
 }
 

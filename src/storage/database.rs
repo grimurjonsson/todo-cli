@@ -34,7 +34,9 @@ pub fn init_database() -> Result<()> {
             collapsed INTEGER NOT NULL DEFAULT 0,
             position INTEGER NOT NULL,
             created_at TEXT NOT NULL,
-            updated_at TEXT NOT NULL
+            updated_at TEXT NOT NULL,
+            completed_at TEXT,
+            deleted_at TEXT
         )",
         [],
     )?;
@@ -44,6 +46,12 @@ pub fn init_database() -> Result<()> {
         [],
     )
     .ok();
+
+    conn.execute("ALTER TABLE todos ADD COLUMN completed_at TEXT", [])
+        .ok();
+
+    conn.execute("ALTER TABLE todos ADD COLUMN deleted_at TEXT", [])
+        .ok();
 
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_todos_date ON todos(date)",
@@ -69,7 +77,9 @@ pub fn init_database() -> Result<()> {
             collapsed INTEGER NOT NULL DEFAULT 0,
             position INTEGER NOT NULL,
             created_at TEXT NOT NULL,
-            updated_at TEXT NOT NULL
+            updated_at TEXT NOT NULL,
+            completed_at TEXT,
+            deleted_at TEXT
         )",
         [],
     )?;
@@ -79,6 +89,15 @@ pub fn init_database() -> Result<()> {
         [],
     )?;
 
+    conn.execute(
+        "ALTER TABLE archived_todos ADD COLUMN completed_at TEXT",
+        [],
+    )
+    .ok();
+
+    conn.execute("ALTER TABLE archived_todos ADD COLUMN deleted_at TEXT", [])
+        .ok();
+
     Ok(())
 }
 
@@ -87,9 +106,9 @@ pub fn load_todos_for_date(date: NaiveDate) -> Result<Vec<TodoItem>> {
     let date_str = date.format("%Y-%m-%d").to_string();
 
     let mut stmt = conn.prepare(
-        "SELECT id, content, state, indent_level, parent_id, due_date, description, collapsed 
+        "SELECT id, content, state, indent_level, parent_id, due_date, description, collapsed, created_at, updated_at, completed_at, deleted_at 
          FROM todos 
-         WHERE date = ?1 
+         WHERE date = ?1 AND deleted_at IS NULL
          ORDER BY position ASC",
     )?;
 
@@ -103,6 +122,10 @@ pub fn load_todos_for_date(date: NaiveDate) -> Result<Vec<TodoItem>> {
         let due_date_str: Option<String> = row.get(5)?;
         let description: Option<String> = row.get(6)?;
         let collapsed: i32 = row.get(7).unwrap_or(0);
+        let created_at_str: Option<String> = row.get(8).ok();
+        let updated_at_str: Option<String> = row.get(9).ok();
+        let completed_at_str: Option<String> = row.get(10).ok().flatten();
+        let deleted_at_str: Option<String> = row.get(11).ok().flatten();
 
         Ok((
             id_str,
@@ -113,6 +136,10 @@ pub fn load_todos_for_date(date: NaiveDate) -> Result<Vec<TodoItem>> {
             due_date_str,
             description,
             collapsed,
+            created_at_str,
+            updated_at_str,
+            completed_at_str,
+            deleted_at_str,
         ))
     })?;
 
@@ -127,6 +154,10 @@ pub fn load_todos_for_date(date: NaiveDate) -> Result<Vec<TodoItem>> {
             due_date_str,
             description,
             collapsed,
+            created_at_str,
+            updated_at_str,
+            completed_at_str,
+            deleted_at_str,
         ) = item?;
 
         let id = Uuid::parse_str(&id_str).unwrap_or_else(|_| Uuid::new_v4());
@@ -143,22 +174,59 @@ pub fn load_todos_for_date(date: NaiveDate) -> Result<Vec<TodoItem>> {
         todo.description = description;
         todo.collapsed = collapsed != 0;
 
+        if let Some(s) = created_at_str {
+            if let Ok(dt) = chrono::DateTime::parse_from_rfc3339(&s) {
+                todo.created_at = dt.with_timezone(&chrono::Utc);
+            }
+        }
+        if let Some(s) = updated_at_str {
+            if let Ok(dt) = chrono::DateTime::parse_from_rfc3339(&s) {
+                todo.modified_at = dt.with_timezone(&chrono::Utc);
+            }
+        }
+        if let Some(s) = completed_at_str {
+            if let Ok(dt) = chrono::DateTime::parse_from_rfc3339(&s) {
+                todo.completed_at = Some(dt.with_timezone(&chrono::Utc));
+            }
+        }
+        if let Some(s) = deleted_at_str {
+            if let Ok(dt) = chrono::DateTime::parse_from_rfc3339(&s) {
+                todo.deleted_at = Some(dt.with_timezone(&chrono::Utc));
+            }
+        }
+
         result.push(todo);
     }
 
     Ok(result)
 }
 
+pub fn soft_delete_todo(id: Uuid, date: NaiveDate) -> Result<()> {
+    let conn = get_connection()?;
+    let id_str = id.to_string();
+    let date_str = date.format("%Y-%m-%d").to_string();
+    let now = chrono::Utc::now().to_rfc3339();
+
+    conn.execute(
+        "UPDATE todos SET deleted_at = ?1, updated_at = ?1 WHERE id = ?2 AND date = ?3",
+        params![now, id_str, date_str],
+    )?;
+
+    Ok(())
+}
+
 pub fn save_todo_list(list: &TodoList) -> Result<()> {
     let conn = get_connection()?;
     let date_str = list.date.format("%Y-%m-%d").to_string();
-    let now = chrono::Utc::now().to_rfc3339();
 
-    conn.execute("DELETE FROM todos WHERE date = ?1", [&date_str])?;
+    conn.execute(
+        "DELETE FROM todos WHERE date = ?1 AND deleted_at IS NULL",
+        [&date_str],
+    )?;
 
     let mut stmt = conn.prepare(
-        "INSERT INTO todos (id, date, content, state, indent_level, parent_id, due_date, description, collapsed, position, created_at, updated_at)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)"
+        "INSERT INTO todos (id, date, content, state, indent_level, parent_id, due_date, description, collapsed, position, created_at, updated_at, completed_at, deleted_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)"
     )?;
 
     for (position, item) in list.items.iter().enumerate() {
@@ -167,6 +235,10 @@ pub fn save_todo_list(list: &TodoList) -> Result<()> {
         let parent_id_str = item.parent_id.map(|id| id.to_string());
         let due_date_str = item.due_date.map(|d| d.format("%Y-%m-%d").to_string());
         let collapsed_int: i32 = if item.collapsed { 1 } else { 0 };
+        let created_at_str = item.created_at.to_rfc3339();
+        let modified_at_str = item.modified_at.to_rfc3339();
+        let completed_at_str = item.completed_at.map(|dt| dt.to_rfc3339());
+        let deleted_at_str = item.deleted_at.map(|dt| dt.to_rfc3339());
 
         stmt.execute(params![
             id_str,
@@ -179,8 +251,10 @@ pub fn save_todo_list(list: &TodoList) -> Result<()> {
             item.description,
             collapsed_int,
             position as i64,
-            now,
-            now,
+            created_at_str,
+            modified_at_str,
+            completed_at_str,
+            deleted_at_str,
         ])?;
     }
 
@@ -192,7 +266,7 @@ pub fn has_todos_for_date(date: NaiveDate) -> Result<bool> {
     let date_str = date.format("%Y-%m-%d").to_string();
 
     let count: i64 = conn.query_row(
-        "SELECT COUNT(*) FROM todos WHERE date = ?1",
+        "SELECT COUNT(*) FROM todos WHERE date = ?1 AND deleted_at IS NULL",
         [&date_str],
         |row| row.get(0),
     )?;
@@ -206,8 +280,8 @@ pub fn archive_todos_for_date(date: NaiveDate) -> Result<usize> {
     let now = chrono::Utc::now().to_rfc3339();
 
     let count = conn.execute(
-        "INSERT INTO archived_todos (id, original_date, archived_at, content, state, indent_level, parent_id, due_date, description, collapsed, position, created_at, updated_at)
-         SELECT id, date, ?1, content, state, indent_level, parent_id, due_date, description, collapsed, position, created_at, updated_at
+        "INSERT INTO archived_todos (id, original_date, archived_at, content, state, indent_level, parent_id, due_date, description, collapsed, position, created_at, updated_at, completed_at, deleted_at)
+         SELECT id, date, ?1, content, state, indent_level, parent_id, due_date, description, collapsed, position, created_at, updated_at, completed_at, deleted_at
          FROM todos WHERE date = ?2",
         params![now, date_str],
     )?;
@@ -222,9 +296,9 @@ pub fn load_archived_todos_for_date(date: NaiveDate) -> Result<Vec<TodoItem>> {
     let date_str = date.format("%Y-%m-%d").to_string();
 
     let mut stmt = conn.prepare(
-        "SELECT id, content, state, indent_level, parent_id, due_date, description, collapsed 
+        "SELECT id, content, state, indent_level, parent_id, due_date, description, collapsed, created_at, updated_at, completed_at, deleted_at 
          FROM archived_todos 
-         WHERE original_date = ?1 
+         WHERE original_date = ?1 AND deleted_at IS NULL
          ORDER BY position ASC",
     )?;
 
@@ -238,6 +312,10 @@ pub fn load_archived_todos_for_date(date: NaiveDate) -> Result<Vec<TodoItem>> {
         let due_date_str: Option<String> = row.get(5)?;
         let description: Option<String> = row.get(6)?;
         let collapsed: i32 = row.get(7).unwrap_or(0);
+        let created_at_str: Option<String> = row.get(8).ok();
+        let updated_at_str: Option<String> = row.get(9).ok();
+        let completed_at_str: Option<String> = row.get(10).ok().flatten();
+        let deleted_at_str: Option<String> = row.get(11).ok().flatten();
 
         Ok((
             id_str,
@@ -248,6 +326,10 @@ pub fn load_archived_todos_for_date(date: NaiveDate) -> Result<Vec<TodoItem>> {
             due_date_str,
             description,
             collapsed,
+            created_at_str,
+            updated_at_str,
+            completed_at_str,
+            deleted_at_str,
         ))
     })?;
 
@@ -262,6 +344,10 @@ pub fn load_archived_todos_for_date(date: NaiveDate) -> Result<Vec<TodoItem>> {
             due_date_str,
             description,
             collapsed,
+            created_at_str,
+            updated_at_str,
+            completed_at_str,
+            deleted_at_str,
         ) = item?;
 
         let id = Uuid::parse_str(&id_str).unwrap_or_else(|_| Uuid::new_v4());
@@ -277,6 +363,27 @@ pub fn load_archived_todos_for_date(date: NaiveDate) -> Result<Vec<TodoItem>> {
         todo.due_date = due_date;
         todo.description = description;
         todo.collapsed = collapsed != 0;
+
+        if let Some(s) = created_at_str {
+            if let Ok(dt) = chrono::DateTime::parse_from_rfc3339(&s) {
+                todo.created_at = dt.with_timezone(&chrono::Utc);
+            }
+        }
+        if let Some(s) = updated_at_str {
+            if let Ok(dt) = chrono::DateTime::parse_from_rfc3339(&s) {
+                todo.modified_at = dt.with_timezone(&chrono::Utc);
+            }
+        }
+        if let Some(s) = completed_at_str {
+            if let Ok(dt) = chrono::DateTime::parse_from_rfc3339(&s) {
+                todo.completed_at = Some(dt.with_timezone(&chrono::Utc));
+            }
+        }
+        if let Some(s) = deleted_at_str {
+            if let Ok(dt) = chrono::DateTime::parse_from_rfc3339(&s) {
+                todo.deleted_at = Some(dt.with_timezone(&chrono::Utc));
+            }
+        }
 
         result.push(todo);
     }
@@ -308,7 +415,9 @@ mod tests {
                 description TEXT,
                 position INTEGER NOT NULL,
                 created_at TEXT NOT NULL,
-                updated_at TEXT NOT NULL
+                updated_at TEXT NOT NULL,
+                completed_at TEXT,
+                deleted_at TEXT
             )",
             [],
         )
@@ -329,14 +438,13 @@ mod tests {
 
     fn save_to_test_db(conn: &Connection, list: &TodoList) {
         let date_str = list.date.format("%Y-%m-%d").to_string();
-        let now = chrono::Utc::now().to_rfc3339();
 
         conn.execute("DELETE FROM todos WHERE date = ?1", [&date_str])
             .unwrap();
 
         let mut stmt = conn.prepare(
-            "INSERT INTO todos (id, date, content, state, indent_level, parent_id, due_date, description, position, created_at, updated_at)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)"
+            "INSERT INTO todos (id, date, content, state, indent_level, parent_id, due_date, description, position, created_at, updated_at, completed_at, deleted_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)"
         ).unwrap();
 
         for (position, item) in list.items.iter().enumerate() {
@@ -344,6 +452,10 @@ mod tests {
             let state_str = item.state.to_char().to_string();
             let parent_id_str = item.parent_id.map(|id| id.to_string());
             let due_date_str = item.due_date.map(|d| d.format("%Y-%m-%d").to_string());
+            let created_at_str = item.created_at.to_rfc3339();
+            let modified_at_str = item.modified_at.to_rfc3339();
+            let completed_at_str = item.completed_at.map(|dt| dt.to_rfc3339());
+            let deleted_at_str = item.deleted_at.map(|dt| dt.to_rfc3339());
 
             stmt.execute(params![
                 id_str,
@@ -355,8 +467,10 @@ mod tests {
                 due_date_str,
                 item.description,
                 position as i64,
-                now,
-                now,
+                created_at_str,
+                modified_at_str,
+                completed_at_str,
+                deleted_at_str,
             ])
             .unwrap();
         }
@@ -752,7 +866,7 @@ mod tests {
     }
 
     #[test]
-    fn test_delete_item_updates_positions() {
+    fn test_remove_item_updates_positions() {
         let (_temp_dir, conn) = setup_test_db();
         let date = NaiveDate::from_ymd_opt(2025, 12, 31).unwrap();
 
@@ -763,8 +877,7 @@ mod tests {
 
         let third_id = list.items[2].id;
 
-        // Delete second item
-        list.delete_item(1).unwrap();
+        list.remove_item(1).unwrap();
 
         // Order is now: First, Third
         assert_eq!(list.items.len(), 2);
