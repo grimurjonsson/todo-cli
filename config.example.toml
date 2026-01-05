@@ -52,6 +52,11 @@ timeoutlen = 1000
 "<Esc>" = "close_help"
 "q" = "quit"
 
+# Day navigation
+"<" = "prev_day"
+">" = "next_day"
+"T" = "go_to_today"
+
 [keybindings.edit]
 "<Esc>" = "edit_cancel"
 "<Enter>" = "edit_confirm"

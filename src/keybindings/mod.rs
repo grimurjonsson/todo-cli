@@ -51,6 +51,11 @@ pub enum Action {
     CloseHelp,
     Quit,
 
+    // Day navigation
+    PrevDay,
+    NextDay,
+    GoToToday,
+
     // Edit mode specific
     EditCancel,
     EditConfirm,
@@ -89,6 +94,9 @@ impl fmt::Display for Action {
             Action::ToggleHelp => "toggle_help",
             Action::CloseHelp => "close_help",
             Action::Quit => "quit",
+            Action::PrevDay => "prev_day",
+            Action::NextDay => "next_day",
+            Action::GoToToday => "go_to_today",
             Action::EditCancel => "edit_cancel",
             Action::EditConfirm => "edit_confirm",
             Action::EditBackspace => "edit_backspace",
@@ -131,6 +139,9 @@ impl FromStr for Action {
             "toggle_help" => Ok(Action::ToggleHelp),
             "close_help" => Ok(Action::CloseHelp),
             "quit" => Ok(Action::Quit),
+            "prev_day" => Ok(Action::PrevDay),
+            "next_day" => Ok(Action::NextDay),
+            "go_to_today" => Ok(Action::GoToToday),
             "edit_cancel" => Ok(Action::EditCancel),
             "edit_confirm" => Ok(Action::EditConfirm),
             "edit_backspace" => Ok(Action::EditBackspace),
@@ -157,14 +168,34 @@ impl KeyBinding {
     }
 
     pub fn from_event(event: &KeyEvent) -> Self {
-        let modifiers = if event.code == KeyCode::BackTab {
-            event.modifiers - KeyModifiers::SHIFT
-        } else {
-            event.modifiers
-        };
-        Self {
-            code: event.code,
-            modifiers,
+        match event.code {
+            KeyCode::BackTab => Self {
+                code: event.code,
+                modifiers: event.modifiers - KeyModifiers::SHIFT,
+            },
+            KeyCode::Char(c) if event.modifiers.contains(KeyModifiers::SHIFT) => {
+                let normalized = match c {
+                    ',' => '<',
+                    '.' => '>',
+                    '<' => '>',
+                    c if c.is_ascii_lowercase() => c.to_ascii_uppercase(),
+                    c => c,
+                };
+                Self {
+                    code: KeyCode::Char(normalized),
+                    modifiers: event.modifiers - KeyModifiers::SHIFT,
+                }
+            }
+            KeyCode::Char(c) if c.is_ascii_uppercase() || c == '<' || c == '>' => {
+                Self {
+                    code: event.code,
+                    modifiers: event.modifiers - KeyModifiers::SHIFT,
+                }
+            }
+            _ => Self {
+                code: event.code,
+                modifiers: event.modifiers,
+            },
         }
     }
 }
@@ -468,14 +499,32 @@ impl Default for KeybindingCache {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct KeybindingsConfig {
-    #[serde(default = "default_navigate_bindings")]
+    #[serde(default)]
     pub navigate: HashMap<String, String>,
 
-    #[serde(default = "default_edit_bindings")]
+    #[serde(default)]
     pub edit: HashMap<String, String>,
 
-    #[serde(default = "default_visual_bindings")]
+    #[serde(default)]
     pub visual: HashMap<String, String>,
+}
+
+impl KeybindingsConfig {
+    pub fn merge_with_defaults(mut self) -> Self {
+        let defaults = Self::default();
+
+        for (key, value) in defaults.navigate {
+            self.navigate.entry(key).or_insert(value);
+        }
+        for (key, value) in defaults.edit {
+            self.edit.entry(key).or_insert(value);
+        }
+        for (key, value) in defaults.visual {
+            self.visual.entry(key).or_insert(value);
+        }
+
+        self
+    }
 }
 
 impl Default for KeybindingsConfig {
@@ -523,6 +572,9 @@ fn default_navigate_bindings() -> HashMap<String, String> {
     m.insert("?".to_string(), "toggle_help".to_string());
     m.insert("<Esc>".to_string(), "close_help".to_string());
     m.insert("q".to_string(), "quit".to_string());
+    m.insert("<".to_string(), "prev_day".to_string());
+    m.insert(">".to_string(), "next_day".to_string());
+    m.insert("T".to_string(), "go_to_today".to_string());
 
     m
 }
@@ -656,5 +708,52 @@ mod tests {
         let s = action.to_string();
         let parsed: Action = s.parse().unwrap();
         assert_eq!(action, parsed);
+    }
+
+    #[test]
+    fn test_parse_angle_brackets() {
+        let seq: KeySequence = "<".parse().unwrap();
+        assert!(seq.is_single());
+        assert_eq!(seq.0[0].code, KeyCode::Char('<'));
+        assert_eq!(seq.0[0].modifiers, KeyModifiers::NONE);
+
+        let seq: KeySequence = ">".parse().unwrap();
+        assert!(seq.is_single());
+        assert_eq!(seq.0[0].code, KeyCode::Char('>'));
+        assert_eq!(seq.0[0].modifiers, KeyModifiers::NONE);
+    }
+
+    #[test]
+    fn test_cache_angle_bracket_lookup() {
+        let cache = KeybindingCache::default();
+
+        let event = KeyEvent::new(KeyCode::Char('<'), KeyModifiers::NONE);
+        let result = cache.lookup_navigate(&event, None);
+        assert_eq!(result, KeyLookupResult::Action(Action::PrevDay));
+
+        let event = KeyEvent::new(KeyCode::Char('>'), KeyModifiers::NONE);
+        let result = cache.lookup_navigate(&event, None);
+        assert_eq!(result, KeyLookupResult::Action(Action::NextDay));
+    }
+
+    #[test]
+    fn test_cache_shifted_comma_period_lookup() {
+        let cache = KeybindingCache::default();
+
+        let event = KeyEvent::new(KeyCode::Char(','), KeyModifiers::SHIFT);
+        let result = cache.lookup_navigate(&event, None);
+        assert_eq!(result, KeyLookupResult::Action(Action::PrevDay));
+
+        let event = KeyEvent::new(KeyCode::Char('.'), KeyModifiers::SHIFT);
+        let result = cache.lookup_navigate(&event, None);
+        assert_eq!(result, KeyLookupResult::Action(Action::NextDay));
+
+        let event = KeyEvent::new(KeyCode::Char('<'), KeyModifiers::SHIFT);
+        let result = cache.lookup_navigate(&event, None);
+        assert_eq!(result, KeyLookupResult::Action(Action::NextDay));
+
+        let event = KeyEvent::new(KeyCode::Char('>'), KeyModifiers::SHIFT);
+        let result = cache.lookup_navigate(&event, None);
+        assert_eq!(result, KeyLookupResult::Action(Action::NextDay));
     }
 }

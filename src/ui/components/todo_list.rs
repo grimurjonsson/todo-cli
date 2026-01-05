@@ -154,8 +154,28 @@ pub fn render(f: &mut Frame, state: &AppState, area: Rect) {
         if state.is_creating_new_item && state.mode == Mode::Edit {
             let new_item_lines = build_wrapped_edit_lines(state, available_width);
             items.push(ListItem::new(new_item_lines));
+        } else if state.is_readonly() {
+            items.push(ListItem::new(Line::from(Span::styled(
+                "",
+                Style::default(),
+            ))));
+            items.push(ListItem::new(Line::from(Span::styled(
+                "  No archived todos for this date",
+                Style::default().fg(state.theme.foreground),
+            ))));
+            items.push(ListItem::new(Line::from(Span::styled(
+                "",
+                Style::default(),
+            ))));
+            items.push(ListItem::new(Line::from(Span::styled(
+                "  Press '>' for next day, '<' for previous day",
+                Style::default().fg(state.theme.foreground),
+            ))));
+            items.push(ListItem::new(Line::from(Span::styled(
+                "  Press 'T' to go back to today",
+                Style::default().fg(state.theme.foreground),
+            ))));
         } else {
-            // Show helpful message when list is empty
             items.push(ListItem::new(Line::from(Span::styled(
                 "",
                 Style::default(),
@@ -179,7 +199,12 @@ pub fn render(f: &mut Frame, state: &AppState, area: Rect) {
         }
     }
 
-    let title = format!(" Todo List - {} ", state.todo_list.date.format("%B %d, %Y"));
+    let title_suffix = if state.is_readonly() { " (Archived)" } else { "" };
+    let title = format!(
+        " Todo List - {}{} ",
+        state.viewing_date.format("%B %d, %Y"),
+        title_suffix
+    );
 
     let list = List::new(items)
         .block(Block::default().borders(Borders::ALL).title(title))
@@ -211,7 +236,7 @@ fn build_wrapped_edit_lines_with_indent(
     let prefix_width = prefix.width();
     let content_max_width = available_width.saturating_sub(prefix_width);
 
-    let edit_wrapped = wrap_text(&state.edit_buffer, content_max_width);
+    let edit_wrapped = wrap_text_preserving_trailing(&state.edit_buffer, content_max_width);
     let edit_row_count = edit_wrapped.len();
     let cursor_line =
         find_cursor_line(&state.edit_buffer, state.edit_cursor_pos, content_max_width);
@@ -226,7 +251,7 @@ fn build_wrapped_edit_lines_with_indent(
         };
 
         if cursor_line == line_idx {
-            let cursor_pos_in_line = find_cursor_pos_in_wrapped_line(
+            let cursor_pos_in_line = find_cursor_pos_in_wrapped_line_preserving(
                 &state.edit_buffer,
                 state.edit_cursor_pos,
                 content_max_width,
@@ -327,41 +352,6 @@ fn find_cursor_line(text: &str, cursor_pos: usize, max_width: usize) -> usize {
     current_line
 }
 
-fn find_cursor_pos_in_wrapped_line(
-    text: &str,
-    cursor_pos: usize,
-    max_width: usize,
-    target_line: usize,
-) -> usize {
-    let wrapped = wrap_text(text, max_width);
-    if target_line >= wrapped.len() {
-        return 0;
-    }
-
-    let mut byte_offset = 0;
-    for (line_idx, line) in wrapped.iter().enumerate() {
-        if line_idx == target_line {
-            break;
-        }
-        byte_offset += line.len();
-        while byte_offset < text.len() {
-            let next_char = text[byte_offset..].chars().next();
-            if next_char == Some(' ') {
-                byte_offset += 1;
-            } else {
-                break;
-            }
-        }
-    }
-
-    if cursor_pos < byte_offset {
-        return 0;
-    }
-
-    let pos_in_line = cursor_pos - byte_offset;
-    pos_in_line.min(wrapped[target_line].len())
-}
-
 fn build_hidden_indices(state: &AppState) -> HashSet<usize> {
     let mut hidden = HashSet::new();
     let items = &state.todo_list.items;
@@ -419,4 +409,55 @@ fn wrap_text(text: &str, max_width: usize) -> Vec<String> {
     }
 
     lines
+}
+
+fn wrap_text_preserving_trailing(text: &str, max_width: usize) -> Vec<String> {
+    if max_width == 0 {
+        return vec![text.to_string()];
+    }
+
+    let trailing_spaces = text.len() - text.trim_end().len();
+    let mut lines = wrap_text(text, max_width);
+
+    if trailing_spaces > 0 && !lines.is_empty() {
+        let last_idx = lines.len() - 1;
+        lines[last_idx].push_str(&" ".repeat(trailing_spaces));
+    }
+
+    lines
+}
+
+fn find_cursor_pos_in_wrapped_line_preserving(
+    text: &str,
+    cursor_pos: usize,
+    max_width: usize,
+    target_line: usize,
+) -> usize {
+    let wrapped = wrap_text_preserving_trailing(text, max_width);
+    if target_line >= wrapped.len() {
+        return 0;
+    }
+
+    let mut byte_offset = 0;
+    for (line_idx, line) in wrapped.iter().enumerate() {
+        if line_idx == target_line {
+            break;
+        }
+        byte_offset += line.trim_end().len();
+        while byte_offset < text.len() {
+            let next_char = text[byte_offset..].chars().next();
+            if next_char == Some(' ') {
+                byte_offset += 1;
+            } else {
+                break;
+            }
+        }
+    }
+
+    if cursor_pos < byte_offset {
+        return 0;
+    }
+
+    let pos_in_line = cursor_pos - byte_offset;
+    pos_in_line.min(wrapped[target_line].len())
 }

@@ -3,7 +3,7 @@ use super::markdown::{parse_todo_list, serialize_todo_list_clean};
 use crate::todo::TodoList;
 use crate::utils::paths::{ensure_directories_exist, get_daily_file_path};
 use anyhow::{Context, Result};
-use chrono::NaiveDate;
+use chrono::{Local, NaiveDate};
 use std::fs;
 
 pub fn load_todo_list(date: NaiveDate) -> Result<TodoList> {
@@ -66,6 +66,30 @@ pub fn file_exists(date: NaiveDate) -> Result<bool> {
 
     let file_path = get_daily_file_path(date)?;
     Ok(file_path.exists())
+}
+
+pub fn load_todos_for_viewing(date: NaiveDate) -> Result<TodoList> {
+    ensure_directories_exist()?;
+    database::init_database()?;
+
+    let today = Local::now().date_naive();
+    let file_path = get_daily_file_path(date)?;
+
+    if date == today {
+        return load_todo_list(date);
+    }
+
+    let items = database::load_archived_todos_for_date(date)?;
+    if !items.is_empty() {
+        return Ok(TodoList::with_items(date, file_path, items));
+    }
+
+    if database::has_todos_for_date(date)? {
+        let items = database::load_todos_for_date(date)?;
+        return Ok(TodoList::with_items(date, file_path, items));
+    }
+
+    Ok(TodoList::new(date, file_path))
 }
 
 #[cfg(test)]

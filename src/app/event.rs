@@ -51,6 +51,28 @@ fn handle_navigate_mode(key: KeyEvent, state: &mut AppState) -> Result<()> {
 }
 
 fn execute_navigate_action(action: Action, state: &mut AppState) -> Result<()> {
+    let dominated_by_readonly = matches!(
+        action,
+        Action::ToggleState
+            | Action::CycleState
+            | Action::Delete
+            | Action::NewItem
+            | Action::NewItemSameLevel
+            | Action::EnterEditMode
+            | Action::Indent
+            | Action::Outdent
+            | Action::IndentWithChildren
+            | Action::OutdentWithChildren
+            | Action::MoveItemUp
+            | Action::MoveItemDown
+            | Action::ToggleCollapse
+            | Action::Undo
+    );
+
+    if state.is_readonly() && dominated_by_readonly {
+        return Ok(());
+    }
+
     match action {
         Action::MoveUp => {
             state.clear_selection();
@@ -237,6 +259,15 @@ fn execute_navigate_action(action: Action, state: &mut AppState) -> Result<()> {
             } else {
                 state.should_quit = true;
             }
+        }
+        Action::PrevDay => {
+            state.navigate_prev_day()?;
+        }
+        Action::NextDay => {
+            state.navigate_next_day()?;
+        }
+        Action::GoToToday => {
+            state.navigate_to_today()?;
         }
         _ => {}
     }

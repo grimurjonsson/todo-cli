@@ -50,6 +50,11 @@ fn render_help_overlay(f: &mut Frame, state: &AppState) {
       Esc                   Close help
       q                     Quit (or close help)
 
+    Day Navigation:
+      <                     Previous day (archived, readonly)
+      >                     Next day
+      T                     Go to today
+
     Insert Mode:
       Esc                   Save and exit to Navigate
       Enter                 Save and create new item

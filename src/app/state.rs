@@ -1,9 +1,11 @@
 use super::mode::Mode;
 use crate::keybindings::{KeyBinding, KeybindingCache};
 use crate::storage::file::load_todo_list;
+use crate::storage::load_todos_for_viewing;
 use crate::todo::{TodoItem, TodoList};
 use crate::ui::theme::Theme;
 use anyhow::Result;
+use chrono::{Duration, Local, NaiveDate};
 use std::time::Instant;
 
 const MAX_UNDO_HISTORY: usize = 50;
@@ -27,6 +29,8 @@ pub struct AppState {
     pub pending_indent_level: usize,
     pub undo_stack: Vec<(TodoList, usize)>,
     pub selection_anchor: Option<usize>,
+    pub viewing_date: NaiveDate,
+    pub today: NaiveDate,
 }
 
 impl AppState {
@@ -36,6 +40,8 @@ impl AppState {
         keybindings: KeybindingCache,
         timeoutlen: u64,
     ) -> Self {
+        let today = Local::now().date_naive();
+        let viewing_date = todo_list.date;
         Self {
             todo_list,
             cursor_position: 0,
@@ -55,7 +61,44 @@ impl AppState {
             pending_indent_level: 0,
             undo_stack: Vec::new(),
             selection_anchor: None,
+            viewing_date,
+            today,
         }
+    }
+
+    pub fn is_readonly(&self) -> bool {
+        self.viewing_date != self.today
+    }
+
+    pub fn navigate_to_date(&mut self, date: NaiveDate) -> Result<()> {
+        if date > self.today {
+            return Ok(());
+        }
+        self.todo_list = load_todos_for_viewing(date)?;
+        self.viewing_date = date;
+        self.cursor_position = 0;
+        self.undo_stack.clear();
+        self.unsaved_changes = false;
+        self.mode = Mode::Navigate;
+        self.edit_buffer.clear();
+        self.edit_cursor_pos = 0;
+        self.is_creating_new_item = false;
+        Ok(())
+    }
+
+    pub fn navigate_prev_day(&mut self) -> Result<()> {
+        let prev = self.viewing_date - Duration::days(1);
+        self.navigate_to_date(prev)
+    }
+
+    pub fn navigate_next_day(&mut self) -> Result<()> {
+        let next = self.viewing_date + Duration::days(1);
+        self.navigate_to_date(next)
+    }
+
+    pub fn navigate_to_today(&mut self) -> Result<()> {
+        self.today = Local::now().date_naive();
+        self.navigate_to_date(self.today)
     }
 
     pub fn save_undo(&mut self) {
