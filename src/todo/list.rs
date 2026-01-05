@@ -1,5 +1,5 @@
 use super::TodoItem;
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 use chrono::NaiveDate;
 use std::collections::HashSet;
 use std::path::PathBuf;
@@ -87,11 +87,19 @@ impl TodoList {
         Ok(())
     }
 
+    #[cfg(test)]
     pub fn remove_item(&mut self, index: usize) -> Result<TodoItem> {
         if index >= self.items.len() {
             return Err(anyhow!("Index out of bounds"));
         }
         Ok(self.items.remove(index))
+    }
+
+    pub fn remove_item_range(&mut self, start: usize, end: usize) -> Result<Vec<TodoItem>> {
+        if start >= self.items.len() || end > self.items.len() || start >= end {
+            return Err(anyhow!("Invalid range"));
+        }
+        Ok(self.items.drain(start..end).collect())
     }
 
     pub fn insert_item(

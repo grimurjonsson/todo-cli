@@ -1,5 +1,5 @@
 use crate::todo::{TodoItem, TodoList, TodoState};
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 use chrono::NaiveDate;
 use std::path::PathBuf;
 

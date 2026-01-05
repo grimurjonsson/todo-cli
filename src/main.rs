@@ -3,6 +3,7 @@ mod app;
 mod cli;
 mod config;
 mod keybindings;
+mod plugin;
 mod storage;
 mod todo;
 mod ui;
@@ -40,6 +41,14 @@ fn main() -> Result<()> {
         }
         Some(Commands::Serve { command, port }) => {
             handle_serve_command(command, port)?;
+        }
+        Some(Commands::Generate {
+            generator,
+            input,
+            list,
+            yes,
+        }) => {
+            handle_generate(generator, input, list, yes)?;
         }
         None => {
             ensure_server_running(DEFAULT_API_PORT)?;
@@ -315,6 +324,152 @@ fn handle_show(date: Option<String>) -> Result<()> {
     println!();
 
     Ok(())
+}
+
+fn handle_generate(
+    generator: Option<String>,
+    input: Option<String>,
+    list: bool,
+    yes: bool,
+) -> Result<()> {
+    use plugin::PluginRegistry;
+
+    let registry = PluginRegistry::new();
+
+    if list {
+        println!("\nAvailable generators:\n");
+        for info in registry.list() {
+            let status = if info.available {
+                "\x1b[32m[available]\x1b[0m"
+            } else {
+                &format!(
+                    "\x1b[31m[unavailable: {}]\x1b[0m",
+                    info.unavailable_reason.as_deref().unwrap_or("unknown")
+                )
+            };
+            println!("  {} - {} {}", info.name, info.description, status);
+        }
+        println!();
+        return Ok(());
+    }
+
+    let generator_name = generator.ok_or_else(|| {
+        anyhow!(
+            "Generator name required. Use --list to see available generators.\n\
+             Usage: todo generate <generator> <input>"
+        )
+    })?;
+
+    let input_value = input.ok_or_else(|| {
+        anyhow!(
+            "Input required for generator '{generator_name}'.\n\
+             Usage: todo generate {generator_name} <input>"
+        )
+    })?;
+
+    let generator_impl = registry.get(&generator_name).ok_or_else(|| {
+        anyhow!(
+            "Generator '{generator_name}' not found. Use --list to see available generators."
+        )
+    })?;
+
+    if let Err(e) = generator_impl.check_available() {
+        return Err(anyhow!(
+            "Generator '{generator_name}' is not available: {e}\n\
+             Please install the required dependencies."
+        ));
+    }
+
+    println!("Fetching data from {generator_name}...");
+    let items = generator_impl.generate(&input_value)?;
+
+    println!("\nGenerated {} todo(s):\n", items.len());
+    for (i, item) in items.iter().enumerate() {
+        let indent = "  ".repeat(item.indent_level);
+        println!("  {}{}. [ ] {}", indent, i + 1, item.content);
+    }
+    println!();
+
+    let items_count = items.len();
+
+    if yes {
+        add_items_to_today(items)?;
+        println!("\x1b[32m✓ Added {items_count} todo(s) to today's list!\x1b[0m");
+        return Ok(());
+    }
+
+    use dialoguer::Select;
+
+    let choices = vec![
+        "Yes - Add all to today's list",
+        "No - Cancel",
+        "Select - Choose which to add",
+    ];
+
+    let selection = Select::new()
+        .with_prompt("Add these todos to today's list?")
+        .items(&choices)
+        .default(0)
+        .interact()?;
+
+    match selection {
+        0 => {
+            add_items_to_today(items)?;
+            println!("\n\x1b[32m✓ Added {items_count} todo(s) to today's list!\x1b[0m");
+        }
+        1 => {
+            println!("\nCancelled.");
+        }
+        2 => {
+            let selected = select_items_interactive(&items)?;
+            if selected.is_empty() {
+                println!("\nNo items selected.");
+            } else {
+                let count = selected.len();
+                add_items_to_today(selected)?;
+                println!("\n\x1b[32m✓ Added {count} todo(s) to today's list!\x1b[0m");
+            }
+        }
+        _ => unreachable!(),
+    }
+
+    Ok(())
+}
+
+fn add_items_to_today(items: Vec<todo::TodoItem>) -> Result<()> {
+    let mut list = check_and_prompt_rollover()?.unwrap_or_else(|| {
+        let today = Local::now().date_naive();
+        todo::TodoList::new(today, utils::paths::get_daily_file_path(today).unwrap())
+    });
+
+    for item in items {
+        list.items.push(item);
+    }
+
+    save_todo_list(&list)?;
+    Ok(())
+}
+
+fn select_items_interactive(items: &[todo::TodoItem]) -> Result<Vec<todo::TodoItem>> {
+    use dialoguer::MultiSelect;
+
+    let display_items: Vec<String> = items
+        .iter()
+        .map(|item| {
+            let indent = "  ".repeat(item.indent_level);
+            format!("{}[ ] {}", indent, item.content)
+        })
+        .collect();
+
+    let selections = MultiSelect::new()
+        .with_prompt("Select items to add (space to toggle, enter to confirm)")
+        .items(&display_items)
+        .interact()?;
+
+    Ok(selections
+        .into_iter()
+        .map(|i| items[i].clone())
+        .collect())
 }
 
 fn handle_import_archive() -> Result<()> {

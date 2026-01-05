@@ -5,9 +5,9 @@ default:
 build:
     cargo build --release
 
-# Build and install to /usr/local/bin
+# Build and install to /usr/local/bin (symlink)
 install: build
-    sudo cp target/release/todo /usr/local/bin/todo
+    sudo ln -sf "$(pwd)/target/release/todo" /usr/local/bin/todo
 
 # Run all tests
 test:

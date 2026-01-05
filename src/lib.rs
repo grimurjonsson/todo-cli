@@ -1,4 +1,5 @@
 pub mod mcp;
+pub mod plugin;
 pub mod storage;
 pub mod todo;
 pub mod utils;

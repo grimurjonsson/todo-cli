@@ -147,29 +147,62 @@ pub fn render(f: &mut Frame, state: &AppState, area: Rect) {
 
         if !item.collapsed {
             if let Some(ref desc) = item.description {
-                let desc_prefix = format!("{}    ", "  ".repeat(item.indent_level));
-                let desc_prefix_width = desc_prefix.width();
-                let desc_max_width = available_width.saturating_sub(desc_prefix_width);
-                let desc_wrapped = wrap_text(desc, desc_max_width);
-                let desc_continuation = " ".repeat(desc_prefix_width);
-                let desc_style = Style::default()
-                    .fg(ratatui::style::Color::DarkGray)
-                    .add_modifier(Modifier::ITALIC);
+                let base_indent = "  ".repeat(item.indent_level);
+                let border_color = ratatui::style::Color::Rgb(100, 100, 120);
+                let text_color = ratatui::style::Color::Rgb(180, 180, 190);
+
+                let top_left = "╭";
+                let top_right = "╮";
+                let bottom_left = "╰";
+                let bottom_right = "╯";
+                let horizontal = "─";
+                let vertical = "│";
+
+                let box_indent = format!("{base_indent}    ");
+                let box_indent_width = box_indent.width();
+                let inner_width = available_width.saturating_sub(box_indent_width + 4);
+                let desc_wrapped = wrap_text(desc, inner_width);
+
+                let border_width = inner_width + 2;
+                let top_border = format!(
+                    "{}{}{}",
+                    top_left,
+                    horizontal.repeat(border_width),
+                    top_right
+                );
+                let bottom_border = format!(
+                    "{}{}{}",
+                    bottom_left,
+                    horizontal.repeat(border_width),
+                    bottom_right
+                );
+
+                let border_style = Style::default().fg(border_color);
+                let text_style = Style::default().fg(text_color);
 
                 let mut desc_lines: Vec<Line> = Vec::new();
-                for (i, line_text) in desc_wrapped.iter().enumerate() {
-                    if i == 0 {
-                        desc_lines.push(Line::from(vec![
-                            Span::styled(desc_prefix.clone(), desc_style),
-                            Span::styled(line_text.clone(), desc_style),
-                        ]));
-                    } else {
-                        desc_lines.push(Line::from(vec![
-                            Span::styled(desc_continuation.clone(), desc_style),
-                            Span::styled(line_text.clone(), desc_style),
-                        ]));
-                    }
+
+                desc_lines.push(Line::from(vec![
+                    Span::styled(box_indent.clone(), Style::default()),
+                    Span::styled(top_border, border_style),
+                ]));
+
+                for line_text in desc_wrapped.iter() {
+                    let padding = inner_width.saturating_sub(line_text.width());
+                    let padded_text = format!("{}{}", line_text, " ".repeat(padding));
+                    desc_lines.push(Line::from(vec![
+                        Span::styled(box_indent.clone(), Style::default()),
+                        Span::styled(format!("{vertical} "), border_style),
+                        Span::styled(padded_text, text_style),
+                        Span::styled(format!(" {vertical}"), border_style),
+                    ]));
                 }
+
+                desc_lines.push(Line::from(vec![
+                    Span::styled(box_indent.clone(), Style::default()),
+                    Span::styled(bottom_border, border_style),
+                ]));
+
                 items.push(ListItem::new(desc_lines));
             }
         }

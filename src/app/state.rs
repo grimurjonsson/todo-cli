@@ -156,14 +156,20 @@ impl AppState {
         if index >= self.todo_list.items.len() {
             return false;
         }
-        let target_indent = self.todo_list.items[index].indent_level;
+        let mut current_indent = self.todo_list.items[index].indent_level;
+        if current_indent == 0 {
+            return false;
+        }
         for i in (0..index).rev() {
             let item = &self.todo_list.items[i];
-            if item.indent_level < target_indent {
+            if item.indent_level < current_indent {
                 if item.collapsed {
                     return true;
                 }
-                break;
+                current_indent = item.indent_level;
+                if current_indent == 0 {
+                    break;
+                }
             }
         }
         false

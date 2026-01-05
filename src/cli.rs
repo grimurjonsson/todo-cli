@@ -31,6 +31,22 @@ pub enum Commands {
         #[arg(short, long, global = true, default_value_t = DEFAULT_API_PORT)]
         port: u16,
     },
+    /// Generate todos from external sources using plugins
+    Generate {
+        /// Generator name (e.g., 'jira')
+        generator: Option<String>,
+
+        /// Input for the generator (e.g., ticket ID)
+        input: Option<String>,
+
+        /// List available generators
+        #[arg(short, long)]
+        list: bool,
+
+        /// Auto-confirm adding all generated todos
+        #[arg(short, long)]
+        yes: bool,
+    },
 }
 
 #[derive(Subcommand, Debug, Clone)]

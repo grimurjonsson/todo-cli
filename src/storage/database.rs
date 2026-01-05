@@ -2,7 +2,7 @@ use crate::todo::{TodoItem, TodoList, TodoState};
 use crate::utils::paths::get_todo_cli_dir;
 use anyhow::{Context, Result};
 use chrono::NaiveDate;
-use rusqlite::{Connection, params};
+use rusqlite::{params, Connection};
 use std::path::PathBuf;
 use uuid::Uuid;
 
@@ -201,16 +201,22 @@ pub fn load_todos_for_date(date: NaiveDate) -> Result<Vec<TodoItem>> {
     Ok(result)
 }
 
-pub fn soft_delete_todo(id: Uuid, date: NaiveDate) -> Result<()> {
+pub fn soft_delete_todos(ids: &[Uuid], date: NaiveDate) -> Result<()> {
+    if ids.is_empty() {
+        return Ok(());
+    }
+
     let conn = get_connection()?;
-    let id_str = id.to_string();
     let date_str = date.format("%Y-%m-%d").to_string();
     let now = chrono::Utc::now().to_rfc3339();
 
-    conn.execute(
-        "UPDATE todos SET deleted_at = ?1, updated_at = ?1 WHERE id = ?2 AND date = ?3",
-        params![now, id_str, date_str],
-    )?;
+    for id in ids {
+        let id_str = id.to_string();
+        conn.execute(
+            "UPDATE todos SET deleted_at = ?1, updated_at = ?1 WHERE id = ?2 AND date = ?3",
+            params![now, id_str, date_str],
+        )?;
+    }
 
     Ok(())
 }
@@ -494,7 +500,7 @@ mod tests {
                 let content: String = row.get(1)?;
                 let state_str: String = row.get(2)?;
                 let indent_level: i64 = row.get(3)?;
-        let indent_level = indent_level as usize;
+                let indent_level = indent_level as usize;
                 let parent_id_str: Option<String> = row.get(4)?;
                 let due_date_str: Option<String> = row.get(5)?;
                 let description: Option<String> = row.get(6)?;
