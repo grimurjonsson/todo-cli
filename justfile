@@ -173,10 +173,13 @@ _release bump:
     sed -i '' "s/^version = \".*\"/version = \"$NEW_VERSION\"/" Cargo.toml
     echo "✓ Version: $VERSION → $NEW_VERSION"
     
+    # Update Cargo.lock with new version
+    cargo check --quiet
+    
     read -p "Create commit and tag? [Y/n] " -n 1 -r
     echo
     if [[ ! $REPLY =~ ^[Nn]$ ]]; then
-        git add Cargo.toml
+        git add Cargo.toml Cargo.lock
         git commit -m "Release v$NEW_VERSION"
         git tag "v$NEW_VERSION"
         echo "✓ Created commit and tag v$NEW_VERSION"
