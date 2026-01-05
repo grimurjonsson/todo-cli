@@ -11,6 +11,7 @@ pub fn handle_key_event(key: KeyEvent, state: &mut AppState) -> Result<()> {
         Mode::Navigate => handle_navigate_mode(key, state)?,
         Mode::Visual => handle_visual_mode(key, state)?,
         Mode::Edit => handle_edit_mode(key, state)?,
+        Mode::ConfirmDelete => handle_confirm_delete_mode(key, state)?,
     }
     Ok(())
 }
@@ -108,11 +109,22 @@ fn execute_navigate_action(action: Action, state: &mut AppState) -> Result<()> {
         }
         Action::Delete => {
             if !state.todo_list.items.is_empty() {
-                state.save_undo();
-                delete_current_item(state)?;
-                save_todo_list(&state.todo_list)?;
-                state.unsaved_changes = false;
-                state.last_save_time = Some(std::time::Instant::now());
+                let has_children = state.todo_list.has_children(state.cursor_position);
+                if has_children {
+                    let (_, end) = state
+                        .todo_list
+                        .get_item_range(state.cursor_position)
+                        .unwrap_or((state.cursor_position, state.cursor_position + 1));
+                    let subtask_count = end - state.cursor_position - 1;
+                    state.pending_delete_subtask_count = Some(subtask_count);
+                    state.mode = Mode::ConfirmDelete;
+                } else {
+                    state.save_undo();
+                    delete_current_item(state)?;
+                    save_todo_list(&state.todo_list)?;
+                    state.unsaved_changes = false;
+                    state.last_save_time = Some(std::time::Instant::now());
+                }
             }
         }
         Action::NewItem => {
@@ -349,6 +361,26 @@ fn execute_visual_action(action: Action, state: &mut AppState) -> Result<()> {
                     state.unsaved_changes = true;
                 }
             }
+        }
+        _ => {}
+    }
+    Ok(())
+}
+
+fn handle_confirm_delete_mode(key: KeyEvent, state: &mut AppState) -> Result<()> {
+    match key.code {
+        KeyCode::Char('y') | KeyCode::Char('Y') | KeyCode::Enter => {
+            state.save_undo();
+            delete_current_item(state)?;
+            save_todo_list(&state.todo_list)?;
+            state.unsaved_changes = false;
+            state.last_save_time = Some(std::time::Instant::now());
+            state.pending_delete_subtask_count = None;
+            state.mode = Mode::Navigate;
+        }
+        KeyCode::Char('n') | KeyCode::Char('N') | KeyCode::Esc => {
+            state.pending_delete_subtask_count = None;
+            state.mode = Mode::Navigate;
         }
         _ => {}
     }

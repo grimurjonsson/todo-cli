@@ -1,3 +1,4 @@
+use crate::app::mode::Mode;
 use crate::app::AppState;
 use ratatui::{
     layout::Rect,
@@ -10,6 +11,11 @@ use ratatui::{
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 pub fn render(f: &mut Frame, state: &AppState, area: Rect) {
+    if state.mode == Mode::ConfirmDelete {
+        render_confirm_delete(f, state, area);
+        return;
+    }
+
     let mode_text = format!("{}", state.mode);
     let readonly_indicator = if state.is_readonly() {
         " [READONLY]"
@@ -70,5 +76,25 @@ pub fn render(f: &mut Frame, state: &AppState, area: Rect) {
 
     let status = Paragraph::new(Line::from(vec![Span::styled(status_line, readonly_style)]));
 
+    f.render_widget(status, area);
+}
+
+fn render_confirm_delete(f: &mut Frame, state: &AppState, area: Rect) {
+    let subtask_count = state.pending_delete_subtask_count.unwrap_or(0);
+    let prompt = format!(
+        " Delete task and its {} subtask{}? (Y/n) ",
+        subtask_count,
+        if subtask_count == 1 { "" } else { "s" }
+    );
+
+    let style = Style::default()
+        .fg(ratatui::style::Color::Black)
+        .bg(ratatui::style::Color::Yellow)
+        .add_modifier(Modifier::BOLD);
+
+    let padding = area.width.saturating_sub(prompt.len() as u16);
+    let status_line = format!("{}{:padding$}", prompt, "", padding = padding as usize);
+
+    let status = Paragraph::new(Line::from(vec![Span::styled(status_line, style)]));
     f.render_widget(status, area);
 }

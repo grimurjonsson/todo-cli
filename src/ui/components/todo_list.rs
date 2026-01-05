@@ -34,7 +34,16 @@ pub fn render(f: &mut Frame, state: &AppState, area: Rect) {
             "  "
         };
 
-        let checkbox = format!("{}", item.state);
+        let checkbox = if item.state == TodoState::Empty && has_children {
+            let (completed, _) = state.todo_list.count_children_stats(idx);
+            if completed > 0 {
+                "[-]".to_string()
+            } else {
+                format!("{}", item.state)
+            }
+        } else {
+            format!("{}", item.state)
+        };
 
         let due_date_str = item
             .due_date
@@ -58,9 +67,16 @@ pub fn render(f: &mut Frame, state: &AppState, area: Rect) {
         let is_visual_cursor = idx == state.cursor_position && state.mode == Mode::Visual;
         let is_in_selection = state.is_selected(idx) && state.mode == Mode::Visual;
 
+        let cursor_color = match item.state {
+            TodoState::Checked => ratatui::style::Color::DarkGray,
+            TodoState::Question => state.theme.question,
+            TodoState::Exclamation => state.theme.exclamation,
+            _ => ratatui::style::Color::White,
+        };
+
         let prefix_style = if is_cursor || is_visual_cursor {
             Style::default()
-                .fg(state.theme.cursor)
+                .fg(cursor_color)
                 .add_modifier(Modifier::REVERSED)
         } else if is_in_selection {
             Style::default()
@@ -72,7 +88,7 @@ pub fn render(f: &mut Frame, state: &AppState, area: Rect) {
 
         let content_style = if is_cursor || is_visual_cursor {
             Style::default()
-                .fg(state.theme.cursor)
+                .fg(cursor_color)
                 .add_modifier(Modifier::REVERSED)
         } else if is_in_selection {
             Style::default()

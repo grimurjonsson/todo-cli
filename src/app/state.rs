@@ -32,6 +32,7 @@ pub struct AppState {
     pub selection_anchor: Option<usize>,
     pub viewing_date: NaiveDate,
     pub today: NaiveDate,
+    pub pending_delete_subtask_count: Option<usize>,
 }
 
 impl AppState {
@@ -65,6 +66,7 @@ impl AppState {
             selection_anchor: None,
             viewing_date,
             today,
+            pending_delete_subtask_count: None,
         }
     }
 

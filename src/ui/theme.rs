@@ -5,7 +5,6 @@ use ratatui::style::Color;
 pub struct Theme {
     pub background: Color,
     pub foreground: Color,
-    pub cursor: Color,
     pub question: Color,
     pub exclamation: Color,
     pub status_bar_bg: Color,
@@ -17,7 +16,6 @@ impl Theme {
         Self {
             background: Color::Reset,
             foreground: Color::White,
-            cursor: Color::Cyan,
             question: Color::Yellow,
             exclamation: Color::Red,
             status_bar_bg: Color::DarkGray,
@@ -29,7 +27,6 @@ impl Theme {
         Self {
             background: Color::Black,
             foreground: Color::White,
-            cursor: Color::Cyan,
             question: Color::Yellow,
             exclamation: Color::Red,
             status_bar_bg: Color::DarkGray,
@@ -41,7 +38,6 @@ impl Theme {
         Self {
             background: Color::White,
             foreground: Color::Black,
-            cursor: Color::Blue,
             question: Color::Yellow,
             exclamation: Color::Red,
             status_bar_bg: Color::LightBlue,

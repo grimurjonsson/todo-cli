@@ -137,14 +137,20 @@ impl TodoListResponse {
         lines.push(format!("## Todos for {date} ({done}/{total})"));
         lines.push(String::new());
 
-        for item in items {
+        for (i, item) in items.iter().enumerate() {
             let indent = "  ".repeat(item.indent_level);
             // Use emojis to avoid markdown interpretation
             let checkbox = match item.state.as_str() {
                 "x" => "✅",
                 "?" => "❔",
                 "!" => "❗",
-                _ => "⬜",
+                _ => {
+                    if Self::has_completed_descendants(items, i) {
+                        "🔳"
+                    } else {
+                        "⬜"
+                    }
+                }
             };
             let due = item
                 .due_date
@@ -155,6 +161,19 @@ impl TodoListResponse {
         }
 
         lines.join("\n")
+    }
+
+    fn has_completed_descendants(items: &[TodoItemResponse], idx: usize) -> bool {
+        let base_indent = items[idx].indent_level;
+        for item in items[idx + 1..].iter() {
+            if item.indent_level <= base_indent {
+                break;
+            }
+            if item.state == "x" {
+                return true;
+            }
+        }
+        false
     }
 }
 

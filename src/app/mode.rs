@@ -3,9 +3,10 @@ use std::fmt;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum Mode {
     #[default]
-    Navigate, // Default: browse, mark, move, delete
-    Edit,   // Text input for new/editing items
-    Visual, // Selection mode (vim-like)
+    Navigate,
+    Edit,
+    Visual,
+    ConfirmDelete,
 }
 
 impl fmt::Display for Mode {
@@ -14,6 +15,7 @@ impl fmt::Display for Mode {
             Mode::Navigate => write!(f, "NAVIGATE"),
             Mode::Edit => write!(f, "INSERT"),
             Mode::Visual => write!(f, "VISUAL"),
+            Mode::ConfirmDelete => write!(f, "CONFIRM"),
         }
     }
 }
