@@ -57,6 +57,9 @@ pub enum Action {
     NextDay,
     GoToToday,
 
+    // Plugin
+    OpenPluginMenu,
+
     // Edit mode specific
     EditCancel,
     EditConfirm,
@@ -101,6 +104,7 @@ impl fmt::Display for Action {
             Action::PrevDay => "prev_day",
             Action::NextDay => "next_day",
             Action::GoToToday => "go_to_today",
+            Action::OpenPluginMenu => "open_plugin_menu",
             Action::EditCancel => "edit_cancel",
             Action::EditConfirm => "edit_confirm",
             Action::EditBackspace => "edit_backspace",
@@ -149,6 +153,7 @@ impl FromStr for Action {
             "prev_day" => Ok(Action::PrevDay),
             "next_day" => Ok(Action::NextDay),
             "go_to_today" => Ok(Action::GoToToday),
+            "open_plugin_menu" => Ok(Action::OpenPluginMenu),
             "edit_cancel" => Ok(Action::EditCancel),
             "edit_confirm" => Ok(Action::EditConfirm),
             "edit_backspace" => Ok(Action::EditBackspace),
@@ -587,6 +592,7 @@ fn default_navigate_bindings() -> HashMap<String, String> {
     m.insert("<".to_string(), "prev_day".to_string());
     m.insert(">".to_string(), "next_day".to_string());
     m.insert("T".to_string(), "go_to_today".to_string());
+    m.insert("p".to_string(), "open_plugin_menu".to_string());
 
     m
 }

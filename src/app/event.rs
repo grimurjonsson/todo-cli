@@ -1,12 +1,15 @@
 use super::mode::Mode;
-use super::state::AppState;
+use super::state::{AppState, PluginSubState};
 use crate::keybindings::{Action, KeyBinding, KeyLookupResult};
+use crate::plugin::PluginRegistry;
 use crate::storage::{save_todo_list, soft_delete_todos};
 use crate::utils::unicode::{
     next_char_boundary, next_word_boundary, prev_char_boundary, prev_word_boundary,
 };
 use anyhow::Result;
 use crossterm::event::{KeyCode, KeyEvent};
+use std::sync::mpsc;
+use std::thread;
 
 pub fn handle_key_event(key: KeyEvent, state: &mut AppState) -> Result<()> {
     match state.mode {
@@ -14,6 +17,7 @@ pub fn handle_key_event(key: KeyEvent, state: &mut AppState) -> Result<()> {
         Mode::Visual => handle_visual_mode(key, state)?,
         Mode::Edit => handle_edit_mode(key, state)?,
         Mode::ConfirmDelete => handle_confirm_delete_mode(key, state)?,
+        Mode::Plugin => handle_plugin_mode(key, state)?,
     }
     Ok(())
 }
@@ -286,6 +290,9 @@ fn execute_navigate_action(action: Action, state: &mut AppState) -> Result<()> {
         }
         Action::GoToToday => {
             state.navigate_to_today()?;
+        }
+        Action::OpenPluginMenu => {
+            state.open_plugin_menu();
         }
         _ => {}
     }
@@ -588,5 +595,243 @@ fn save_edit_buffer(state: &mut AppState) -> Result<()> {
     state.edit_cursor_pos = 0;
     state.unsaved_changes = true;
 
+    Ok(())
+}
+
+fn handle_plugin_mode(key: KeyEvent, state: &mut AppState) -> Result<()> {
+    let plugin_state = match state.plugin_state.take() {
+        Some(ps) => ps,
+        None => {
+            state.close_plugin_menu();
+            return Ok(());
+        }
+    };
+
+    match plugin_state {
+        PluginSubState::Selecting {
+            plugins,
+            selected_index,
+        } => handle_plugin_selecting(key, state, plugins, selected_index),
+        PluginSubState::InputPrompt {
+            plugin_name,
+            input_buffer,
+            cursor_pos,
+        } => handle_plugin_input(key, state, plugin_name, input_buffer, cursor_pos),
+        PluginSubState::Executing { plugin_name } => {
+            state.plugin_state = Some(PluginSubState::Executing { plugin_name });
+            Ok(())
+        }
+        PluginSubState::Error { message } => handle_plugin_error(key, state, message),
+        PluginSubState::Preview { items } => handle_plugin_preview(key, state, items),
+    }
+}
+
+fn handle_plugin_selecting(
+    key: KeyEvent,
+    state: &mut AppState,
+    plugins: Vec<crate::plugin::GeneratorInfo>,
+    mut selected_index: usize,
+) -> Result<()> {
+    match key.code {
+        KeyCode::Esc | KeyCode::Char('q') => {
+            state.close_plugin_menu();
+        }
+        KeyCode::Up | KeyCode::Char('k') => {
+            selected_index = selected_index.saturating_sub(1);
+            state.plugin_state = Some(PluginSubState::Selecting {
+                plugins,
+                selected_index,
+            });
+        }
+        KeyCode::Down | KeyCode::Char('j') => {
+            if selected_index < plugins.len().saturating_sub(1) {
+                selected_index += 1;
+            }
+            state.plugin_state = Some(PluginSubState::Selecting {
+                plugins,
+                selected_index,
+            });
+        }
+        KeyCode::Enter => {
+            if let Some(plugin) = plugins.get(selected_index) {
+                if plugin.available {
+                    state.plugin_state = Some(PluginSubState::InputPrompt {
+                        plugin_name: plugin.name.clone(),
+                        input_buffer: String::new(),
+                        cursor_pos: 0,
+                    });
+                } else {
+                    let reason = plugin
+                        .unavailable_reason
+                        .clone()
+                        .unwrap_or_else(|| "Unknown reason".to_string());
+                    state.plugin_state = Some(PluginSubState::Error {
+                        message: format!("Plugin '{}' is not available: {}", plugin.name, reason),
+                    });
+                }
+            }
+        }
+        _ => {
+            state.plugin_state = Some(PluginSubState::Selecting {
+                plugins,
+                selected_index,
+            });
+        }
+    }
+    Ok(())
+}
+
+fn handle_plugin_input(
+    key: KeyEvent,
+    state: &mut AppState,
+    plugin_name: String,
+    mut input_buffer: String,
+    mut cursor_pos: usize,
+) -> Result<()> {
+    match key.code {
+        KeyCode::Esc => {
+            let plugins = state.plugin_registry.list();
+            state.plugin_state = Some(PluginSubState::Selecting {
+                plugins,
+                selected_index: 0,
+            });
+        }
+        KeyCode::Enter => {
+            if input_buffer.trim().is_empty() {
+                state.plugin_state = Some(PluginSubState::InputPrompt {
+                    plugin_name,
+                    input_buffer,
+                    cursor_pos,
+                });
+                return Ok(());
+            }
+
+            state.plugin_state = Some(PluginSubState::Executing {
+                plugin_name: plugin_name.clone(),
+            });
+
+            let (tx, rx) = mpsc::channel();
+            state.plugin_result_rx = Some(rx);
+
+            let input = input_buffer.clone();
+            let name = plugin_name.clone();
+
+            thread::spawn(move || {
+                let registry = PluginRegistry::new();
+                let result = match registry.get(&name) {
+                    Some(generator) => generator
+                        .generate(&input)
+                        .map_err(|e| format!("Plugin error: {e}")),
+                    None => Err(format!("Plugin '{name}' not found")),
+                };
+                let _ = tx.send(result);
+            });
+        }
+        KeyCode::Backspace => {
+            if cursor_pos > 0 {
+                let prev = prev_char_boundary(&input_buffer, cursor_pos);
+                input_buffer.drain(prev..cursor_pos);
+                cursor_pos = prev;
+            }
+            state.plugin_state = Some(PluginSubState::InputPrompt {
+                plugin_name,
+                input_buffer,
+                cursor_pos,
+            });
+        }
+        KeyCode::Left => {
+            if cursor_pos > 0 {
+                cursor_pos = prev_char_boundary(&input_buffer, cursor_pos);
+            }
+            state.plugin_state = Some(PluginSubState::InputPrompt {
+                plugin_name,
+                input_buffer,
+                cursor_pos,
+            });
+        }
+        KeyCode::Right => {
+            if cursor_pos < input_buffer.len() {
+                cursor_pos = next_char_boundary(&input_buffer, cursor_pos);
+            }
+            state.plugin_state = Some(PluginSubState::InputPrompt {
+                plugin_name,
+                input_buffer,
+                cursor_pos,
+            });
+        }
+        KeyCode::Home => {
+            cursor_pos = 0;
+            state.plugin_state = Some(PluginSubState::InputPrompt {
+                plugin_name,
+                input_buffer,
+                cursor_pos,
+            });
+        }
+        KeyCode::End => {
+            cursor_pos = input_buffer.len();
+            state.plugin_state = Some(PluginSubState::InputPrompt {
+                plugin_name,
+                input_buffer,
+                cursor_pos,
+            });
+        }
+        KeyCode::Char(c) => {
+            input_buffer.insert(cursor_pos, c);
+            cursor_pos += c.len_utf8();
+            state.plugin_state = Some(PluginSubState::InputPrompt {
+                plugin_name,
+                input_buffer,
+                cursor_pos,
+            });
+        }
+        _ => {
+            state.plugin_state = Some(PluginSubState::InputPrompt {
+                plugin_name,
+                input_buffer,
+                cursor_pos,
+            });
+        }
+    }
+    Ok(())
+}
+
+fn handle_plugin_error(key: KeyEvent, state: &mut AppState, message: String) -> Result<()> {
+    match key.code {
+        KeyCode::Esc | KeyCode::Enter | KeyCode::Char('q') => {
+            state.close_plugin_menu();
+        }
+        _ => {
+            state.plugin_state = Some(PluginSubState::Error { message });
+        }
+    }
+    Ok(())
+}
+
+fn handle_plugin_preview(
+    key: KeyEvent,
+    state: &mut AppState,
+    items: Vec<crate::todo::TodoItem>,
+) -> Result<()> {
+    match key.code {
+        KeyCode::Char('y') | KeyCode::Char('Y') | KeyCode::Enter => {
+            let count = items.len();
+            state.save_undo();
+            for item in items {
+                state.todo_list.items.push(item);
+            }
+            state.unsaved_changes = true;
+            save_todo_list(&state.todo_list)?;
+            state.unsaved_changes = false;
+            state.last_save_time = Some(std::time::Instant::now());
+            state.set_status_message(format!("Added {count} item(s) from plugin"));
+            state.close_plugin_menu();
+        }
+        KeyCode::Char('n') | KeyCode::Char('N') | KeyCode::Esc => {
+            state.close_plugin_menu();
+        }
+        _ => {
+            state.plugin_state = Some(PluginSubState::Preview { items });
+        }
+    }
     Ok(())
 }

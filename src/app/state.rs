@@ -1,14 +1,38 @@
 use super::mode::Mode;
 use crate::keybindings::{KeyBinding, KeybindingCache};
+use crate::plugin::{GeneratorInfo, PluginRegistry};
 use crate::storage::file::load_todo_list;
 use crate::storage::load_todos_for_viewing;
 use crate::todo::{TodoItem, TodoList};
 use crate::ui::theme::Theme;
 use anyhow::Result;
 use chrono::{Duration, Local, NaiveDate};
+use std::sync::mpsc;
 use std::time::Instant;
 
 const MAX_UNDO_HISTORY: usize = 50;
+
+#[derive(Debug, Clone)]
+pub enum PluginSubState {
+    Selecting {
+        plugins: Vec<GeneratorInfo>,
+        selected_index: usize,
+    },
+    InputPrompt {
+        plugin_name: String,
+        input_buffer: String,
+        cursor_pos: usize,
+    },
+    Executing {
+        plugin_name: String,
+    },
+    Error {
+        message: String,
+    },
+    Preview {
+        items: Vec<TodoItem>,
+    },
+}
 
 pub struct AppState {
     pub todo_list: TodoList,
@@ -33,6 +57,10 @@ pub struct AppState {
     pub viewing_date: NaiveDate,
     pub today: NaiveDate,
     pub pending_delete_subtask_count: Option<usize>,
+    pub plugin_registry: PluginRegistry,
+    pub plugin_state: Option<PluginSubState>,
+    pub status_message: Option<(String, Instant)>,
+    pub plugin_result_rx: Option<mpsc::Receiver<Result<Vec<TodoItem>, String>>>,
 }
 
 impl AppState {
@@ -41,6 +69,7 @@ impl AppState {
         theme: Theme,
         keybindings: KeybindingCache,
         timeoutlen: u64,
+        plugin_registry: PluginRegistry,
     ) -> Self {
         let today = Local::now().date_naive();
         let viewing_date = todo_list.date;
@@ -67,6 +96,10 @@ impl AppState {
             viewing_date,
             today,
             pending_delete_subtask_count: None,
+            plugin_registry,
+            plugin_state: None,
+            status_message: None,
+            plugin_result_rx: None,
         }
     }
 
@@ -245,5 +278,59 @@ impl AppState {
         self.clamp_cursor();
         self.unsaved_changes = false;
         Ok(())
+    }
+
+    pub fn open_plugin_menu(&mut self) {
+        let plugins = self.plugin_registry.list();
+        self.plugin_state = Some(PluginSubState::Selecting {
+            plugins,
+            selected_index: 0,
+        });
+        self.mode = Mode::Plugin;
+    }
+
+    pub fn close_plugin_menu(&mut self) {
+        self.plugin_state = None;
+        self.mode = Mode::Navigate;
+    }
+
+    pub fn set_status_message(&mut self, message: String) {
+        self.status_message = Some((message, Instant::now()));
+    }
+
+    pub fn clear_expired_status_message(&mut self) {
+        if let Some((_, time)) = &self.status_message {
+            if time.elapsed().as_secs() > 3 {
+                self.status_message = None;
+            }
+        }
+    }
+
+    pub fn check_plugin_result(&mut self) {
+        if let Some(rx) = &self.plugin_result_rx {
+            match rx.try_recv() {
+                Ok(Ok(items)) => {
+                    self.plugin_result_rx = None;
+                    if items.is_empty() {
+                        self.plugin_state = Some(PluginSubState::Error {
+                            message: "Plugin generated no items".to_string(),
+                        });
+                    } else {
+                        self.plugin_state = Some(PluginSubState::Preview { items });
+                    }
+                }
+                Ok(Err(e)) => {
+                    self.plugin_result_rx = None;
+                    self.plugin_state = Some(PluginSubState::Error { message: e });
+                }
+                Err(mpsc::TryRecvError::Empty) => {}
+                Err(mpsc::TryRecvError::Disconnected) => {
+                    self.plugin_result_rx = None;
+                    self.plugin_state = Some(PluginSubState::Error {
+                        message: "Plugin execution thread crashed".to_string(),
+                    });
+                }
+            }
+        }
     }
 }

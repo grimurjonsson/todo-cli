@@ -60,7 +60,9 @@ fn main() -> Result<()> {
 
             let theme = Theme::from_config(&config);
             let keybindings = KeybindingCache::from_config(&config.keybindings);
-            let state = app::AppState::new(list, theme, keybindings, config.timeoutlen);
+            let plugin_registry = plugin::PluginRegistry::new();
+            let state =
+                app::AppState::new(list, theme, keybindings, config.timeoutlen, plugin_registry);
 
             ui::run_tui(state)?;
         }

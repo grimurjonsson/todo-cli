@@ -7,6 +7,7 @@ pub enum Mode {
     Edit,
     Visual,
     ConfirmDelete,
+    Plugin,
 }
 
 impl fmt::Display for Mode {
@@ -16,6 +17,7 @@ impl fmt::Display for Mode {
             Mode::Edit => write!(f, "INSERT"),
             Mode::Visual => write!(f, "VISUAL"),
             Mode::ConfirmDelete => write!(f, "CONFIRM"),
+            Mode::Plugin => write!(f, "PLUGIN"),
         }
     }
 }

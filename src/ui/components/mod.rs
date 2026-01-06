@@ -1,12 +1,14 @@
 pub mod status_bar;
 pub mod todo_list;
 
+use crate::app::state::PluginSubState;
 use crate::app::AppState;
 
 use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
-    style::Style,
-    widgets::{Block, Borders, Clear, Paragraph, Wrap},
+    style::{Modifier, Style},
+    text::{Line, Span},
+    widgets::{Block, Borders, Clear, List, ListItem, Paragraph, Wrap},
     Frame,
 };
 
@@ -28,6 +30,10 @@ pub fn render(f: &mut Frame, state: &AppState) {
     if state.show_help {
         render_help_overlay(f, state);
     }
+
+    if let Some(ref plugin_state) = state.plugin_state {
+        render_plugin_overlay(f, state, plugin_state);
+    }
 }
 
 fn render_help_overlay(f: &mut Frame, state: &AppState) {
@@ -45,6 +51,7 @@ fn render_help_overlay(f: &mut Frame, state: &AppState) {
       Enter / n             New item
       dd                    Delete item
       c                     Collapse/expand children
+      p                     Open plugins menu
       u                     Undo
       ?                     Toggle help
       Esc                   Close help
@@ -99,4 +106,208 @@ fn centered_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {
             Constraint::Percentage((100 - percent_x) / 2),
         ])
         .split(popup_layout[1])[1]
+}
+
+fn render_plugin_overlay(f: &mut Frame, state: &AppState, plugin_state: &PluginSubState) {
+    match plugin_state {
+        PluginSubState::Selecting {
+            plugins,
+            selected_index,
+        } => render_plugin_selecting(f, state, plugins, *selected_index),
+        PluginSubState::InputPrompt {
+            plugin_name,
+            input_buffer,
+            cursor_pos,
+        } => render_plugin_input(f, state, plugin_name, input_buffer, *cursor_pos),
+        PluginSubState::Executing { plugin_name } => render_plugin_executing(f, state, plugin_name),
+        PluginSubState::Error { message } => render_plugin_error(f, state, message),
+        PluginSubState::Preview { items } => render_plugin_preview(f, state, items),
+    }
+}
+
+fn render_plugin_selecting(
+    f: &mut Frame,
+    state: &AppState,
+    plugins: &[crate::plugin::GeneratorInfo],
+    selected_index: usize,
+) {
+    let area = centered_rect(50, 40, f.area());
+
+    let items: Vec<ListItem> = plugins
+        .iter()
+        .enumerate()
+        .map(|(i, plugin)| {
+            let status = if plugin.available {
+                Span::styled("[OK]", Style::default().fg(ratatui::style::Color::Green))
+            } else {
+                Span::styled("[N/A]", Style::default().fg(ratatui::style::Color::Red))
+            };
+
+            let name_style = if i == selected_index {
+                Style::default()
+                    .fg(ratatui::style::Color::Yellow)
+                    .add_modifier(Modifier::BOLD | Modifier::REVERSED)
+            } else if plugin.available {
+                Style::default().fg(state.theme.foreground)
+            } else {
+                Style::default().fg(ratatui::style::Color::DarkGray)
+            };
+
+            let line = Line::from(vec![
+                Span::styled(format!(" {} ", plugin.name), name_style),
+                status,
+                Span::raw(" "),
+                Span::styled(
+                    &plugin.description,
+                    Style::default().fg(ratatui::style::Color::Gray),
+                ),
+            ]);
+
+            ListItem::new(line)
+        })
+        .collect();
+
+    let list = List::new(items)
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .title(" Plugins (Enter to select, Esc to cancel) ")
+                .style(Style::default().bg(state.theme.background)),
+        )
+        .style(Style::default().fg(state.theme.foreground));
+
+    f.render_widget(Clear, area);
+    f.render_widget(list, area);
+}
+
+fn render_plugin_input(
+    f: &mut Frame,
+    state: &AppState,
+    plugin_name: &str,
+    input_buffer: &str,
+    cursor_pos: usize,
+) {
+    let area = centered_rect(60, 20, f.area());
+
+    let inner_area = Rect {
+        x: area.x + 1,
+        y: area.y + 1,
+        width: area.width.saturating_sub(2),
+        height: area.height.saturating_sub(2),
+    };
+
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .title(format!(" {plugin_name} - Enter input (Esc to go back) "))
+        .style(Style::default().bg(state.theme.background));
+
+    f.render_widget(Clear, area);
+    f.render_widget(block, area);
+
+    let before_cursor = &input_buffer[..cursor_pos];
+    let after_cursor = &input_buffer[cursor_pos..];
+
+    let cursor_char = if after_cursor.is_empty() {
+        "█"
+    } else {
+        &after_cursor[..after_cursor
+            .chars()
+            .next()
+            .map(|c| c.len_utf8())
+            .unwrap_or(0)]
+    };
+
+    let after_cursor_rest = if after_cursor.is_empty() {
+        ""
+    } else {
+        &after_cursor[after_cursor
+            .chars()
+            .next()
+            .map(|c| c.len_utf8())
+            .unwrap_or(0)..]
+    };
+
+    let input_line = Line::from(vec![
+        Span::raw(before_cursor),
+        Span::styled(
+            cursor_char,
+            Style::default()
+                .bg(ratatui::style::Color::Yellow)
+                .fg(ratatui::style::Color::Black),
+        ),
+        Span::raw(after_cursor_rest),
+    ]);
+
+    let input_paragraph = Paragraph::new(input_line);
+    f.render_widget(input_paragraph, inner_area);
+}
+
+fn render_plugin_executing(f: &mut Frame, state: &AppState, plugin_name: &str) {
+    let area = centered_rect(40, 15, f.area());
+
+    let text = format!("Running {plugin_name}...\n\nPlease wait.");
+
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .title(" Executing Plugin ")
+        .style(Style::default().bg(state.theme.background));
+
+    let paragraph = Paragraph::new(text)
+        .block(block)
+        .style(Style::default().fg(state.theme.foreground))
+        .wrap(Wrap { trim: true });
+
+    f.render_widget(Clear, area);
+    f.render_widget(paragraph, area);
+}
+
+fn render_plugin_error(f: &mut Frame, state: &AppState, message: &str) {
+    let area = centered_rect(60, 30, f.area());
+
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .title(" Error (Press Esc to dismiss) ")
+        .style(
+            Style::default()
+                .bg(state.theme.background)
+                .fg(ratatui::style::Color::Red),
+        );
+
+    let paragraph = Paragraph::new(message)
+        .block(block)
+        .style(Style::default().fg(ratatui::style::Color::Red))
+        .wrap(Wrap { trim: true });
+
+    f.render_widget(Clear, area);
+    f.render_widget(paragraph, area);
+}
+
+fn render_plugin_preview(f: &mut Frame, state: &AppState, items: &[crate::todo::TodoItem]) {
+    let area = centered_rect(70, 60, f.area());
+
+    let list_items: Vec<ListItem> = items
+        .iter()
+        .map(|item| {
+            let indent = "  ".repeat(item.indent_level);
+            let line = format!("{}[ ] {}", indent, item.content);
+            ListItem::new(Line::from(Span::styled(
+                line,
+                Style::default().fg(state.theme.foreground),
+            )))
+        })
+        .collect();
+
+    let title = format!(" Generated {} item(s) - Add to list? (Y/n) ", items.len());
+
+    let list = List::new(list_items)
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .title(title)
+                .style(Style::default().bg(state.theme.background)),
+        )
+        .style(Style::default().fg(state.theme.foreground));
+
+    f.render_widget(Clear, area);
+    f.render_widget(list, area);
 }

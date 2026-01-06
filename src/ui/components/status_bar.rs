@@ -16,6 +16,13 @@ pub fn render(f: &mut Frame, state: &AppState, area: Rect) {
         return;
     }
 
+    if let Some((message, time)) = &state.status_message {
+        if time.elapsed().as_secs() <= 3 {
+            render_status_message(f, message, area);
+            return;
+        }
+    }
+
     let mode_text = format!("{}", state.mode);
     let readonly_indicator = if state.is_readonly() {
         " [READONLY]"
@@ -94,6 +101,26 @@ fn render_confirm_delete(f: &mut Frame, state: &AppState, area: Rect) {
 
     let padding = area.width.saturating_sub(prompt.len() as u16);
     let status_line = format!("{}{:padding$}", prompt, "", padding = padding as usize);
+
+    let status = Paragraph::new(Line::from(vec![Span::styled(status_line, style)]));
+    f.render_widget(status, area);
+}
+
+fn render_status_message(f: &mut Frame, message: &str, area: Rect) {
+    let display_message = format!(" {message} ");
+
+    let style = Style::default()
+        .fg(ratatui::style::Color::Black)
+        .bg(ratatui::style::Color::Green)
+        .add_modifier(Modifier::BOLD);
+
+    let padding = area.width.saturating_sub(display_message.len() as u16);
+    let status_line = format!(
+        "{}{:padding$}",
+        display_message,
+        "",
+        padding = padding as usize
+    );
 
     let status = Paragraph::new(Line::from(vec![Span::styled(status_line, style)]));
     f.render_widget(status, area);

@@ -96,6 +96,9 @@ fn run_app(
     db_rx: mpsc::Receiver<()>,
 ) -> Result<()> {
     loop {
+        state.clear_expired_status_message();
+        state.check_plugin_result();
+
         terminal.draw(|f| {
             components::render(f, state);
         })?;
