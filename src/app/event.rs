@@ -217,7 +217,15 @@ fn execute_navigate_action(action: Action, state: &mut AppState) -> Result<()> {
             }
         }
         Action::ToggleCollapse => {
-            if state.todo_list.has_children(state.cursor_position) {
+            let has_children = state.todo_list.has_children(state.cursor_position);
+            let has_description = state
+                .todo_list
+                .items
+                .get(state.cursor_position)
+                .map(|item| item.description.is_some())
+                .unwrap_or(false);
+
+            if has_children || has_description {
                 state.save_undo();
                 if let Some(item) = state.todo_list.items.get_mut(state.cursor_position) {
                     item.collapsed = !item.collapsed;
@@ -226,13 +234,17 @@ fn execute_navigate_action(action: Action, state: &mut AppState) -> Result<()> {
             }
         }
         Action::Expand => {
-            let should_expand = state.todo_list.has_children(state.cursor_position)
-                && state
-                    .todo_list
-                    .items
-                    .get(state.cursor_position)
-                    .map(|item| item.collapsed)
-                    .unwrap_or(false);
+            let has_children = state.todo_list.has_children(state.cursor_position);
+            let item_info = state
+                .todo_list
+                .items
+                .get(state.cursor_position)
+                .map(|item| (item.collapsed, item.description.is_some()));
+
+            let should_expand = match item_info {
+                Some((true, has_desc)) => has_children || has_desc,
+                _ => false,
+            };
 
             if should_expand {
                 state.save_undo();
@@ -244,14 +256,16 @@ fn execute_navigate_action(action: Action, state: &mut AppState) -> Result<()> {
         }
         Action::CollapseOrParent => {
             let has_children = state.todo_list.has_children(state.cursor_position);
-            let is_collapsed = state
+            let item_info = state
                 .todo_list
                 .items
                 .get(state.cursor_position)
-                .map(|item| item.collapsed)
-                .unwrap_or(false);
+                .map(|item| (item.collapsed, item.description.is_some()));
 
-            if has_children && !is_collapsed {
+            let (is_collapsed, has_description) = item_info.unwrap_or((false, false));
+            let is_collapsible = has_children || has_description;
+
+            if is_collapsible && !is_collapsed {
                 state.save_undo();
                 if let Some(item) = state.todo_list.items.get_mut(state.cursor_position) {
                     item.collapsed = true;

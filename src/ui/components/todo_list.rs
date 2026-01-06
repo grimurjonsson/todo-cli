@@ -24,7 +24,10 @@ pub fn render(f: &mut Frame, state: &AppState, area: Rect) {
         let indent = "  ".repeat(item.indent_level);
         let has_children = state.todo_list.has_children(idx);
 
-        let fold_icon = if has_children {
+        let has_description = item.description.is_some();
+        let is_collapsible = has_children || has_description;
+
+        let fold_icon = if is_collapsible {
             if item.collapsed {
                 "▶ "
             } else {
@@ -50,7 +53,7 @@ pub fn render(f: &mut Frame, state: &AppState, area: Rect) {
             .map(|d| format!(" [{}]", d.format("%Y-%m-%d")))
             .unwrap_or_default();
 
-        let collapse_indicator = if item.collapsed {
+        let collapse_indicator = if item.collapsed && has_children {
             let (completed, total) = state.todo_list.count_children_stats(idx);
             format!(" ({completed}/{total})")
         } else {
@@ -123,26 +126,44 @@ pub fn render(f: &mut Frame, state: &AppState, area: Rect) {
                 build_wrapped_edit_lines_for_existing(state, available_width, item.indent_level);
             items.push(ListItem::new(edit_lines));
         } else {
-            let wrapped_lines = wrap_text(&content_with_extras, content_max_width);
-            let continuation_indent = " ".repeat(prefix_width + checkbox_width);
+            let should_truncate = item.collapsed && has_description;
 
-            let mut lines: Vec<Line> = Vec::new();
-            for (i, line_text) in wrapped_lines.iter().enumerate() {
-                if i == 0 {
-                    lines.push(Line::from(vec![
-                        Span::styled(prefix.clone(), prefix_style),
-                        Span::styled(checkbox_with_space.clone(), content_style),
-                        Span::styled(line_text.clone(), content_style),
-                    ]));
-                } else {
-                    lines.push(Line::from(vec![
-                        Span::styled(continuation_indent.clone(), prefix_style),
-                        Span::styled(line_text.clone(), content_style),
-                    ]));
+            if should_truncate {
+                let content_with_due = format!("{}{}", item.content, due_date_str);
+                let indicator_width = collapse_indicator.width();
+                let available_for_content = content_max_width.saturating_sub(indicator_width);
+                let truncated_content =
+                    truncate_with_ellipsis(&content_with_due, available_for_content);
+                let display_text = format!("{truncated_content}{collapse_indicator}");
+
+                let lines = vec![Line::from(vec![
+                    Span::styled(prefix.clone(), prefix_style),
+                    Span::styled(checkbox_with_space.clone(), content_style),
+                    Span::styled(display_text, content_style),
+                ])];
+                items.push(ListItem::new(lines));
+            } else {
+                let wrapped_lines = wrap_text(&content_with_extras, content_max_width);
+                let continuation_indent = " ".repeat(prefix_width + checkbox_width);
+
+                let mut lines: Vec<Line> = Vec::new();
+                for (i, line_text) in wrapped_lines.iter().enumerate() {
+                    if i == 0 {
+                        lines.push(Line::from(vec![
+                            Span::styled(prefix.clone(), prefix_style),
+                            Span::styled(checkbox_with_space.clone(), content_style),
+                            Span::styled(line_text.clone(), content_style),
+                        ]));
+                    } else {
+                        lines.push(Line::from(vec![
+                            Span::styled(continuation_indent.clone(), prefix_style),
+                            Span::styled(line_text.clone(), content_style),
+                        ]));
+                    }
                 }
-            }
 
-            items.push(ListItem::new(lines));
+                items.push(ListItem::new(lines));
+            }
         }
 
         if !item.collapsed {
@@ -444,6 +465,32 @@ fn build_hidden_indices(state: &AppState) -> HashSet<usize> {
     }
 
     hidden
+}
+
+fn truncate_with_ellipsis(text: &str, max_width: usize) -> String {
+    if max_width == 0 {
+        return String::new();
+    }
+
+    let ellipsis = "…";
+    let ellipsis_width = 1;
+
+    let mut result = String::new();
+    let mut current_width = 0;
+
+    for c in text.chars() {
+        let char_width = c.to_string().width();
+
+        if current_width + char_width + ellipsis_width > max_width {
+            result.push_str(ellipsis);
+            return result;
+        }
+
+        result.push(c);
+        current_width += char_width;
+    }
+
+    result
 }
 
 fn wrap_text(text: &str, max_width: usize) -> Vec<String> {

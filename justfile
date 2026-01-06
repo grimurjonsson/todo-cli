@@ -150,13 +150,13 @@ install-opencode-skill:
     echo "✓ Installed $SKILL_NAME skill to $TARGET_DIR"
 
 # Bump patch version (0.1.0 → 0.1.1)
-release-patch: (_release "patch")
+release-patch msg="": (_release "patch" msg)
 # Bump minor version (0.1.0 → 0.2.0)
-release-minor: (_release "minor")
+release-minor msg="": (_release "minor" msg)
 # Bump major version (0.1.0 → 1.0.0)
-release-major: (_release "major")
+release-major msg="": (_release "major" msg)
 
-_release bump:
+_release bump msg="":
     #!/usr/bin/env bash
     set -euo pipefail
     
@@ -180,7 +180,11 @@ _release bump:
     echo
     if [[ ! $REPLY =~ ^[Nn]$ ]]; then
         git add Cargo.toml Cargo.lock
-        git commit -m "Release v$NEW_VERSION"
+        if [ -n "{{msg}}" ]; then
+            git commit -m "Release v$NEW_VERSION" -m "{{msg}}"
+        else
+            git commit -m "Release v$NEW_VERSION"
+        fi
         git tag "v$NEW_VERSION"
         echo "✓ Created commit and tag v$NEW_VERSION"
     fi
