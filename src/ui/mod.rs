@@ -103,7 +103,7 @@ fn run_app(
             components::render(f, state);
         })?;
 
-        if event::poll(Duration::from_millis(100))? {
+        if event::poll(Duration::from_millis(1000))? {
             match event::read()? {
                 Event::Key(key) if key.kind == KeyEventKind::Press => {
                     handle_key_event(key, state)?;
