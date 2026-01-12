@@ -5,7 +5,7 @@ default:
 build:
     cargo build --release
 
-# Build and install to /usr/local/bin
+# Build and install to ~/.local/bin
 install:
     #!/usr/bin/env bash
     set -euo pipefail
@@ -31,38 +31,139 @@ install:
     echo "✓ rustc found: $(rustc --version)"
 
     echo ""
-    echo "Building release binary..."
+    echo "Building release binaries..."
     cargo build --release
 
-    BINARY_SRC="$(pwd)/target/release/totui"
-    INSTALL_DIR="/usr/local/bin"
-    BINARY_DST="$INSTALL_DIR/totui"
+    INSTALL_DIR="${INSTALL_DIR:-$HOME/.local/bin}"
+    BINARIES=("totui" "totui-mcp")
 
-    if [ ! -f "$BINARY_SRC" ]; then
-        echo "❌ Build failed: $BINARY_SRC not found"
-        exit 1
-    fi
+    # Check for existing installations in different locations
+    check_existing_binary() {
+        local binary_name="$1"
+        local existing_path
+        existing_path=$(command -v "$binary_name" 2>/dev/null || true)
 
-    echo "✓ Binary built successfully"
-    echo ""
-    echo "Installing to $BINARY_DST..."
+        if [ -n "$existing_path" ]; then
+            existing_path=$(realpath "$existing_path" 2>/dev/null || echo "$existing_path")
+            local existing_dir=$(dirname "$existing_path")
 
-    # Check if files are identical
-    if [ -f "$BINARY_DST" ] && cmp -s "$BINARY_SRC" "$BINARY_DST"; then
-        echo "✓ Binary already installed and up to date"
-    else
-        # Check if we need sudo (try without first)
-        if [ -w "$INSTALL_DIR" ]; then
-            cp "$BINARY_SRC" "$BINARY_DST"
-            chmod +x "$BINARY_DST"
-        else
-            echo "Need sudo to write to $INSTALL_DIR"
-            sudo cp "$BINARY_SRC" "$BINARY_DST"
-            sudo chmod +x "$BINARY_DST"
+            if [ "$existing_dir" != "$INSTALL_DIR" ]; then
+                echo "$existing_path"
+            fi
         fi
-        echo "✓ Installed to $BINARY_DST"
+    }
+
+    EXISTING_BINARIES=()
+    for BINARY_NAME in "${BINARIES[@]}"; do
+        if [ -f "$(pwd)/target/release/$BINARY_NAME" ]; then
+            EXISTING=$(check_existing_binary "$BINARY_NAME")
+            if [ -n "$EXISTING" ]; then
+                EXISTING_BINARIES+=("$BINARY_NAME:$EXISTING")
+            fi
+        fi
+    done
+
+    if [ ${#EXISTING_BINARIES[@]} -gt 0 ]; then
+        echo ""
+        echo "⚠️  Found existing installation(s) in different location:"
+        echo ""
+        for entry in "${EXISTING_BINARIES[@]}"; do
+            binary_name="${entry%%:*}"
+            existing_path="${entry#*:}"
+            echo "   $binary_name: $existing_path"
+        done
+        echo ""
+        echo "New install directory: $INSTALL_DIR"
+        echo ""
+        echo "What would you like to do?"
+        echo ""
+        echo "  1) Delete old binary and install to $INSTALL_DIR (default)"
+        echo "  2) Install to existing location instead ($(dirname "${EXISTING_BINARIES[0]#*:}"))"
+        echo "  3) Keep both (install to $INSTALL_DIR anyway)"
+        echo "  4) Cancel installation"
+        echo ""
+        read -p "Choose [1/2/3/4] (default: 1): " -n 1 -r EXISTING_CHOICE
+        echo ""
+        echo ""
+
+        case "$EXISTING_CHOICE" in
+            2)
+                INSTALL_DIR=$(dirname "${EXISTING_BINARIES[0]#*:}")
+                echo "Installing to existing location: $INSTALL_DIR"
+                ;;
+            3)
+                echo "Installing to $INSTALL_DIR (keeping existing binaries)"
+                ;;
+            4)
+                echo "Installation cancelled."
+                exit 0
+                ;;
+            *)
+                for entry in "${EXISTING_BINARIES[@]}"; do
+                    existing_path="${entry#*:}"
+                    existing_dir=$(dirname "$existing_path")
+                    echo "Removing old binary: $existing_path"
+                    if [ -w "$existing_dir" ]; then
+                        rm -f "$existing_path"
+                    else
+                        sudo rm -f "$existing_path"
+                    fi
+                done
+                echo ""
+                ;;
+        esac
     fi
+
+    # Ensure install directory exists
+    mkdir -p "$INSTALL_DIR"
+
+    # Check if we need sudo
+    NEED_SUDO=false
+    if [ ! -w "$INSTALL_DIR" ]; then
+        NEED_SUDO=true
+        echo "Note: Will need sudo to install to $INSTALL_DIR"
+        echo ""
+    fi
+
+    # Install each binary
+    for BINARY_NAME in "${BINARIES[@]}"; do
+        BINARY_SRC="$(pwd)/target/release/$BINARY_NAME"
+        BINARY_DST="$INSTALL_DIR/$BINARY_NAME"
+
+        if [ ! -f "$BINARY_SRC" ]; then
+            echo "⚠️  Skipping $BINARY_NAME: not built"
+            continue
+        fi
+
+        if [ -f "$BINARY_DST" ] && cmp -s "$BINARY_SRC" "$BINARY_DST"; then
+            echo "✓ $BINARY_NAME already installed and up to date"
+        else
+            if [ "$NEED_SUDO" = true ]; then
+                sudo cp "$BINARY_SRC" "$BINARY_DST"
+                sudo chmod +x "$BINARY_DST"
+            else
+                cp "$BINARY_SRC" "$BINARY_DST"
+                chmod +x "$BINARY_DST"
+            fi
+            echo "✓ Installed $BINARY_NAME to $BINARY_DST"
+        fi
+    done
+
     echo ""
+
+    # Check if install dir is in PATH
+    if [[ ":$PATH:" != *":$INSTALL_DIR:"* ]]; then
+        echo "⚠️  $INSTALL_DIR is not in your PATH"
+        echo ""
+        echo "Add it to your shell config:"
+        echo "  echo 'export PATH=\"\$HOME/.local/bin:\$PATH\"' >> ~/.bashrc"
+        echo "  # or for zsh:"
+        echo "  echo 'export PATH=\"\$HOME/.local/bin:\$PATH\"' >> ~/.zshrc"
+        echo ""
+        echo "Then restart your terminal or run: source ~/.bashrc (or ~/.zshrc)"
+        echo ""
+    fi
+
     echo "Run 'totui' to start the TUI"
 
 # Run all tests

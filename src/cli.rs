@@ -4,7 +4,8 @@ use clap::{Parser, Subcommand};
 pub const DEFAULT_API_PORT: u16 = 48372;
 
 #[derive(Parser, Debug)]
-#[command(name = "todo")]
+#[command(name = "totui")]
+#[command(version)]
 #[command(about = "A terminal-based todo list manager with daily rolling lists", long_about = None)]
 pub struct Cli {
     #[command(subcommand)]

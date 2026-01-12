@@ -21,20 +21,27 @@ A terminal-based todo list manager with daily rolling lists, hierarchical tasks,
 
 ## Installation
 
-### Prerequisites
+### Quick Install (Recommended)
 
-- [Rust](https://rustup.rs/) 1.85 or later
+Run this in your terminal to download and install pre-built binaries:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/grimurjonsson/to-tui/main/scripts/install.sh | bash
+```
+
+The installer will prompt you to choose what to install:
+- **totui** - The terminal UI app
+- **totui-mcp** - MCP server for Claude/LLM integration
+- **Both** - Install both binaries
 
 ### From Source
 
+Requires [Rust](https://rustup.rs/) 1.85 or later:
+
 ```bash
-# Clone the repository
 git clone https://github.com/grimurjonsson/to-tui.git
 cd to-tui
-
-# Build and install
 just install
-
 ```
 
 ### Using Cargo
