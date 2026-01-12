@@ -245,6 +245,69 @@ install-opencode-skill:
 
     echo "✓ Installed $SKILL_NAME skill to $TARGET_DIR"
 
+# Build release binaries for all platforms (requires cross)
+build-release-binaries:
+    #!/usr/bin/env bash
+    set -euo pipefail
+
+    echo "Building release binaries for multiple platforms..."
+    echo ""
+
+    # Check if cross is installed
+    if ! command -v cross &> /dev/null; then
+        echo "❌ 'cross' is not installed"
+        echo ""
+        echo "Install cross with: cargo install cross"
+        exit 1
+    fi
+
+    TARGETS=(
+        "x86_64-unknown-linux-gnu"
+        "aarch64-unknown-linux-gnu"
+        "x86_64-apple-darwin"
+        "aarch64-apple-darwin"
+        "x86_64-pc-windows-gnu"
+    )
+
+    # Add targets if not already installed
+    echo "Ensuring all targets are installed..."
+    for target in "${TARGETS[@]}"; do
+        rustup target add "$target" 2>/dev/null || true
+    done
+    echo ""
+
+    mkdir -p release-binaries
+
+    for target in "${TARGETS[@]}"; do
+        echo "Building for $target..."
+
+        # Use cargo for Apple targets (cross doesn't support them well)
+        if [[ "$target" == *"apple-darwin"* ]]; then
+            cargo build --release --target "$target"
+            binary_ext=""
+        elif [[ "$target" == *"windows"* ]]; then
+            cross build --release --target "$target"
+            binary_ext=".exe"
+        else
+            cross build --release --target "$target"
+            binary_ext=""
+        fi
+
+        # Copy both binaries to release-binaries directory with target suffix
+        cp "target/$target/release/todo${binary_ext}" "release-binaries/todo-$target${binary_ext}"
+        cp "target/$target/release/todo-mcp${binary_ext}" "release-binaries/todo-mcp-$target${binary_ext}"
+        echo "✓ Built: release-binaries/todo-$target${binary_ext}"
+        echo "✓ Built: release-binaries/todo-mcp-$target${binary_ext}"
+        echo ""
+    done
+
+    echo "✓ All binaries built successfully"
+    echo ""
+    echo "Binaries are in the release-binaries/ directory:"
+    ls -lh release-binaries/
+    echo ""
+    echo "Upload these to your GitHub release"
+
 # Bump patch version (0.1.0 → 0.1.1)
 release-patch msg="": (_release "patch" msg)
 

@@ -1,5 +1,6 @@
 /target
 .claude/
+release-binaries/
 
 # Local planning docs
 DB_DESIGN.md

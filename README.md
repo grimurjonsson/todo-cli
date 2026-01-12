@@ -122,32 +122,40 @@ The MCP server allows AI assistants like Claude to manage your todos.
 3. Go to the "Installed" tab
 4. Look for an option to add a plugin from URL (may be a button or text input)
 5. Enter the GitHub URL: `https://github.com/grimurjonsson/todo-cli.git`
-6. After installation, build the MCP server (one-time setup):
+6. After installation, download the pre-built binary (one-time setup):
    ```bash
    # Find the installed plugin directory
    cd ~/.claude/plugins/repos/todo-mcp
-   # Or if installed via cache:
+   # Or if installed via marketplace:
    # cd ~/.claude/plugins/cache/*/todo-mcp/*
 
-   # Build the binary
-   cargo build --release --bin todo-mcp
+   # Run the installation script
+   bash scripts/install-binary.sh
    ```
 7. Restart Claude Code
 
 The MCP server will now be available in **all** Claude Code instances.
 
-**One-time Build Requirement:**
+**Pre-built Binaries:**
 
-After installation, you need to build the MCP server binary once because:
-- The plugin is installed from source (Git repository)
-- The Rust binary needs to be compiled for your system
-- Future updates can reuse the built binary
+The installation script automatically downloads the correct binary for your platform:
+- macOS (Intel): `x86_64-apple-darwin`
+- macOS (Apple Silicon): `aarch64-apple-darwin`
+- Linux (Intel/AMD): `x86_64-unknown-linux-gnu`
+- Linux (ARM): `aarch64-unknown-linux-gnu`
+- Windows (Intel/AMD): `x86_64-pc-windows-gnu`
+
+If you prefer to build from source instead:
+```bash
+cd ~/.claude/plugins/repos/todo-mcp
+cargo build --release --bin todo-mcp
+```
 
 **Updating the Plugin:**
 
 When updates are available:
 1. Update through the plugin UI
-2. Rebuild the binary: `cd ~/.claude/plugins/cache/.../todo-mcp/... && cargo build --release --bin todo-mcp`
+2. Re-run the installation script: `bash scripts/install-binary.sh`
 3. Restart Claude Code
 
 #### Local Development Setup
