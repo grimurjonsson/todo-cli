@@ -36,10 +36,10 @@ cargo fmt
 cargo clippy
 
 # Run MCP server
-cargo run --release --bin todo-mcp
+cargo run --release --bin totui-mcp
 
 # Run MCP server with debug logging
-RUST_LOG=debug cargo run --bin todo-mcp
+RUST_LOG=debug cargo run --bin totui-mcp
 ```
 
 ### Using Just
@@ -63,7 +63,7 @@ just configure-mcp-opencode     # Add to OpenCode config
 
 - **`src/main.rs`**: CLI entrypoint, command routing, and API server lifecycle management
 - **`src/lib.rs`**: Public library interface (exports mcp, plugin, storage, todo, utils)
-- **`src/bin/todo-mcp.rs`**: MCP server binary entrypoint
+- **`src/bin/totui-mcp.rs`**: MCP server binary entrypoint
 
 ### Core Modules
 
@@ -74,7 +74,7 @@ just configure-mcp-opencode     # Add to OpenCode config
   - `hierarchy.rs`: Parent-child relationship operations
 
 - **`storage/`**: Data persistence layer
-  - `file.rs`: Writes TodoList to markdown files (`~/.local/share/todo-cli/dailies/YYYY-MM-DD.md`)
+  - `file.rs`: Writes TodoList to markdown files (`~/.local/share/to-tui/dailies/YYYY-MM-DD.md`)
   - `markdown.rs`: Parses markdown format with checkbox states `[ ]`, `[x]`, `[?]`, `[!]`
   - `database.rs`: SQLite operations for `todos` and `archived_todos` tables
   - `rollover.rs`: Daily rollover logic (copies incomplete items to new date, archives old items)
@@ -105,7 +105,7 @@ just configure-mcp-opencode     # Add to OpenCode config
 
 ### Data Flow
 
-1. **Startup**: Load today's todos from `~/.local/share/todo-cli/dailies/YYYY-MM-DD.md`
+1. **Startup**: Load today's todos from `~/.local/share/to-tui/dailies/YYYY-MM-DD.md`
 2. **Rollover check**: If opening for first time today, prompt to copy incomplete items from yesterday
 3. **TUI loop**: User edits todos, changes saved to markdown file in real-time
 4. **API server**: Auto-starts when TUI launches, provides HTTP access to same data
@@ -146,10 +146,10 @@ See `DB_DESIGN.md` for full schema details.
 - **Todo states**: ` ` (empty), `x` (done), `?` (question), `!` (important)
 - **Date format**: YYYY-MM-DD for storage, "Month DD, YYYY" for display
 - **Timestamps**: RFC3339 format
-- **Configuration**: `~/.config/todo-cli/config.toml`
-- **Data directory**: `~/.local/share/todo-cli/`
-- **Daily files**: `~/.local/share/todo-cli/dailies/YYYY-MM-DD.md`
-- **Archive database**: `~/.local/share/todo-cli/archive.db`
+- **Configuration**: `~/.config/to-tui/config.toml`
+- **Data directory**: `~/.local/share/to-tui/`
+- **Daily files**: `~/.local/share/to-tui/dailies/YYYY-MM-DD.md`
+- **Archive database**: `~/.local/share/to-tui/archive.db`
 
 ## MCP Server Integration
 

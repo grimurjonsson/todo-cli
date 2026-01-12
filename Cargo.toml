@@ -1,19 +1,19 @@
 [package]
-name = "todo-cli"
+name = "to-tui"
 version = "0.1.17"
 edition = "2024"
 
 [lib]
-name = "todo_cli"
+name = "to_tui"
 path = "src/lib.rs"
 
 [[bin]]
-name = "todo"
+name = "totui"
 path = "src/main.rs"
 
 [[bin]]
-name = "todo-mcp"
-path = "src/bin/todo-mcp.rs"
+name = "totui-mcp"
+path = "src/bin/totui-mcp.rs"
 
 [dependencies]
 ratatui = "0.30"

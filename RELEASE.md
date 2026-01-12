@@ -63,7 +63,7 @@ git push origin --tags
 
 The `.github/workflows/release.yml` workflow will automatically:
 1. Trigger when a tag matching `v*` is pushed
-2. Build both `todo` and `todo-mcp` binaries for all platforms:
+2. Build both `totui` and `totui-mcp` binaries for all platforms:
    - Linux (Intel/AMD): `x86_64-unknown-linux-gnu`
    - Linux (ARM): `aarch64-unknown-linux-gnu`
    - macOS (Intel): `x86_64-apple-darwin`
@@ -73,10 +73,10 @@ The `.github/workflows/release.yml` workflow will automatically:
 4. Create or update the release on GitHub
 
 You can monitor the workflow progress at:
-https://github.com/grimurjonsson/todo-cli/actions
+https://github.com/grimurjonsson/to-tui/actions
 
 Once complete, the release will be available at:
-https://github.com/grimurjonsson/todo-cli/releases
+https://github.com/grimurjonsson/to-tui/releases
 
 **Note:** You can still add release notes manually by editing the release on GitHub after the workflow completes.
 
@@ -85,7 +85,7 @@ https://github.com/grimurjonsson/todo-cli/releases
 When users install or update the plugin via Claude Code:
 
 ```bash
-cd ~/.claude/plugins/repos/todo-mcp
+cd ~/.claude/plugins/repos/totui-mcp
 bash scripts/install-binary.sh
 ```
 
@@ -98,8 +98,8 @@ The script will automatically:
 ## Binary Naming Convention
 
 Each release includes both the TUI binary and MCP server binary:
-- **TUI binary**: `todo-{target}[.exe]`
-- **MCP binary**: `todo-mcp-{target}[.exe]`
+- **TUI binary**: `totui-{target}[.exe]`
+- **MCP binary**: `totui-mcp-{target}[.exe]`
 
 Where `{target}` is one of:
 - `x86_64-unknown-linux-gnu`
@@ -108,7 +108,7 @@ Where `{target}` is one of:
 - `aarch64-apple-darwin`
 - `x86_64-pc-windows-gnu` (with `.exe` extension)
 
-The installation script (`scripts/install-binary.sh`) automatically downloads the correct `todo-mcp` binary for the user's platform.
+The installation script (`scripts/install-binary.sh`) automatically downloads the correct `totui-mcp` binary for the user's platform.
 
 ## Troubleshooting
 

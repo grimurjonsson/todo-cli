@@ -1,5 +1,5 @@
 use crate::todo::{TodoItem, TodoList, TodoState};
-use crate::utils::paths::get_todo_cli_dir;
+use crate::utils::paths::get_to_tui_dir;
 use anyhow::{Context, Result};
 use chrono::NaiveDate;
 use rusqlite::{params, Connection};
@@ -7,7 +7,7 @@ use std::path::PathBuf;
 use uuid::Uuid;
 
 fn get_db_path() -> Result<PathBuf> {
-    let dir = get_todo_cli_dir()?;
+    let dir = get_to_tui_dir()?;
     Ok(dir.join("todos.db"))
 }
 

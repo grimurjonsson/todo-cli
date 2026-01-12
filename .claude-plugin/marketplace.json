@@ -1,18 +1,18 @@
 {
   "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
-  "name": "todo-mcp",
-  "version": "0.1.15",
+  "name": "totui-mcp",
+  "version": "0.1.17",
   "description": "Terminal todo list manager with MCP server integration",
   "owner": {
-    "name": "todo-cli"
+    "name": "to-tui"
   },
   "plugins": [
     {
-      "name": "todo-mcp",
-      "description": "MCP server for todo-cli - terminal todo list manager with daily todos, hierarchical tasks, and rollover support",
-      "version": "0.1.15",
+      "name": "totui-mcp",
+      "description": "MCP server for to-tui - terminal todo list manager with daily todos, hierarchical tasks, and rollover support",
+      "version": "0.1.17",
       "author": {
-        "name": "todo-cli"
+        "name": "to-tui"
       },
       "source": "./",
       "category": "productivity"

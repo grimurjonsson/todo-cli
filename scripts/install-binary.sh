@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Script to download and install pre-built todo-mcp binary from GitHub releases
+# Script to download and install pre-built totui-mcp binary from GitHub releases
 # This runs after the plugin is installed from the marketplace
 
-REPO="grimurjonsson/todo-cli"
-BINARY_NAME="todo-mcp"
+REPO="grimurjonsson/to-tui"
+BINARY_NAME="totui-mcp"
 
-echo "Installing todo-mcp binary..."
+echo "Installing totui-mcp binary..."
 echo ""
 
 # Detect platform
@@ -69,7 +69,7 @@ if [ -z "$LATEST_TAG" ]; then
         echo "   Build from source instead:"
         SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
         PLUGIN_ROOT="$(dirname "$SCRIPT_DIR")"
-        echo "   cd $PLUGIN_ROOT && cargo build --release --bin todo-mcp"
+        echo "   cd $PLUGIN_ROOT && cargo build --release --bin totui-mcp"
     else
         # Show the API response for debugging
         echo "   API Response:"
@@ -106,7 +106,7 @@ if ! curl -L -f -o "$INSTALL_DIR/$BINARY_NAME${BINARY_EXT}" "$DOWNLOAD_URL"; the
     echo "   3. Network connection issue"
     echo ""
     echo "   You can build from source instead:"
-    echo "   cd $PLUGIN_ROOT && cargo build --release --bin todo-mcp"
+    echo "   cd $PLUGIN_ROOT && cargo build --release --bin totui-mcp"
     exit 1
 fi
 

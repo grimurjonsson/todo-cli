@@ -34,9 +34,9 @@ install:
     echo "Building release binary..."
     cargo build --release
 
-    BINARY_SRC="$(pwd)/target/release/todo"
+    BINARY_SRC="$(pwd)/target/release/totui"
     INSTALL_DIR="/usr/local/bin"
-    BINARY_DST="$INSTALL_DIR/todo"
+    BINARY_DST="$INSTALL_DIR/totui"
 
     if [ ! -f "$BINARY_SRC" ]; then
         echo "❌ Build failed: $BINARY_SRC not found"
@@ -63,7 +63,7 @@ install:
         echo "✓ Installed to $BINARY_DST"
     fi
     echo ""
-    echo "Run 'todo' to start the TUI"
+    echo "Run 'totui' to start the TUI"
 
 # Run all tests
 test:
@@ -71,11 +71,11 @@ test:
 
 # Start MCP server (release mode)
 start-mcp-server:
-    cargo run --release --bin todo-mcp
+    cargo run --release --bin totui-mcp
 
 # Start MCP server with debug logging
 start-mcp-server-debug:
-    RUST_LOG=debug cargo run --bin todo-mcp
+    RUST_LOG=debug cargo run --bin totui-mcp
 
 # Start REST API server as daemon
 start-api-server port="3000":
@@ -91,7 +91,7 @@ api-status:
 
 # Open MCP inspector for debugging
 inspect-mcp:
-    npx @modelcontextprotocol/inspector cargo run --release --bin todo-mcp
+    npx @modelcontextprotocol/inspector cargo run --release --bin totui-mcp
 
 # Run the TUI app
 tui:
@@ -102,14 +102,14 @@ setup-mcp-claude-dev:
     #!/usr/bin/env bash
     set -euo pipefail
 
-    echo "Setting up todo-mcp for local Claude Code development..."
+    echo "Setting up totui-mcp for local Claude Code development..."
     echo ""
 
     # Build the binary
     echo "Building MCP server binary..."
-    cargo build --release --bin todo-mcp
+    cargo build --release --bin totui-mcp
 
-    if [ ! -f "target/release/todo-mcp" ]; then
+    if [ ! -f "target/release/totui-mcp" ]; then
         echo "❌ Build failed"
         exit 1
     fi
@@ -118,7 +118,7 @@ setup-mcp-claude-dev:
     echo ""
 
     # Create symlink in .claude/plugins/repos for local development
-    PLUGIN_DIR="$HOME/.claude/plugins/repos/todo-mcp"
+    PLUGIN_DIR="$HOME/.claude/plugins/repos/totui-mcp"
     PROJECT_DIR="$(pwd)"
 
     if [ -L "$PLUGIN_DIR" ]; then
@@ -135,17 +135,17 @@ setup-mcp-claude-dev:
     echo "Restart Claude Code to load the plugin."
     echo ""
     echo "For production use, install via GitHub URL in Claude Code:"
-    echo "  /plugin -> Add from URL -> https://github.com/grimurjonsson/todo-cli.git"
+    echo "  /plugin -> Add from URL -> https://github.com/grimurjonsson/to-tui.git"
 
-# Add todo-mcp to OpenCode config
+# Add totui-mcp to OpenCode config
 configure-mcp-opencode:
     #!/usr/bin/env bash
     set -euo pipefail
 
     # Build release binary first
-    cargo build --release --bin todo-mcp
+    cargo build --release --bin totui-mcp
 
-    BINARY_PATH="$(pwd)/target/release/todo-mcp"
+    BINARY_PATH="$(pwd)/target/release/totui-mcp"
     CONFIG_DIR="$HOME/.config/opencode"
     CONFIG_FILE="$CONFIG_DIR/opencode.json"
 
@@ -165,25 +165,25 @@ configure-mcp-opencode:
     if [ -f "$CONFIG_FILE" ]; then
         # File exists - merge with existing config
         if jq -e '.mcp' "$CONFIG_FILE" > /dev/null 2>&1; then
-            # mcp section exists - add/update todo-mcp entry
-            jq --argjson mcp "$MCP_CONFIG" '.mcp["todo-mcp"] = $mcp' "$CONFIG_FILE" > "$CONFIG_FILE.tmp"
+            # mcp section exists - add/update totui-mcp entry
+            jq --argjson mcp "$MCP_CONFIG" '.mcp["totui-mcp"] = $mcp' "$CONFIG_FILE" > "$CONFIG_FILE.tmp"
         else
             # no mcp section - add it
-            jq --argjson mcp "$MCP_CONFIG" '. + {mcp: {"todo-mcp": $mcp}}' "$CONFIG_FILE" > "$CONFIG_FILE.tmp"
+            jq --argjson mcp "$MCP_CONFIG" '. + {mcp: {"totui-mcp": $mcp}}' "$CONFIG_FILE" > "$CONFIG_FILE.tmp"
         fi
         mv "$CONFIG_FILE.tmp" "$CONFIG_FILE"
-        echo "✓ Updated $CONFIG_FILE with todo-mcp server"
+        echo "✓ Updated $CONFIG_FILE with totui-mcp server"
     else
         # Create new config file
         cat > "$CONFIG_FILE" <<EOF
     {
       "\$schema": "https://opencode.ai/config.json",
       "mcp": {
-        "todo-mcp": $MCP_CONFIG
+        "totui-mcp": $MCP_CONFIG
       }
     }
     EOF
-        echo "✓ Created $CONFIG_FILE with todo-mcp server"
+        echo "✓ Created $CONFIG_FILE with totui-mcp server"
     fi
 
     echo ""
@@ -192,27 +192,27 @@ configure-mcp-opencode:
     echo ""
     echo "Restart OpenCode to load the new MCP server."
 
-# Remove todo-mcp from OpenCode config
+# Remove totui-mcp from OpenCode config
 remove-mcp-opencode:
     #!/usr/bin/env bash
     set -euo pipefail
 
     CONFIG_FILE="$HOME/.config/opencode/opencode.json"
 
-    if [ -f "$CONFIG_FILE" ] && jq -e '.mcp["todo-mcp"]' "$CONFIG_FILE" > /dev/null 2>&1; then
-        jq 'del(.mcp["todo-mcp"])' "$CONFIG_FILE" > "$CONFIG_FILE.tmp"
+    if [ -f "$CONFIG_FILE" ] && jq -e '.mcp["totui-mcp"]' "$CONFIG_FILE" > /dev/null 2>&1; then
+        jq 'del(.mcp["totui-mcp"])' "$CONFIG_FILE" > "$CONFIG_FILE.tmp"
         mv "$CONFIG_FILE.tmp" "$CONFIG_FILE"
-        echo "✓ Removed todo-mcp from $CONFIG_FILE"
+        echo "✓ Removed totui-mcp from $CONFIG_FILE"
     else
-        echo "todo-mcp not found in OpenCode config"
+        echo "totui-mcp not found in OpenCode config"
     fi
 
-# Install todo-mcp skill to Claude Code
+# Install totui-mcp skill to Claude Code
 install-claude-skill:
     #!/usr/bin/env bash
     set -euo pipefail
 
-    SKILL_NAME="todo-mcp"
+    SKILL_NAME="totui-mcp"
     SOURCE_DIR="$(pwd)/skills/$SKILL_NAME"
     TARGET_DIR="$HOME/.claude/skills/$SKILL_NAME"
 
@@ -226,12 +226,12 @@ install-claude-skill:
 
     echo "✓ Installed $SKILL_NAME skill to $TARGET_DIR"
 
-# Install todo-mcp skill to OpenCode
+# Install totui-mcp skill to OpenCode
 install-opencode-skill:
     #!/usr/bin/env bash
     set -euo pipefail
 
-    SKILL_NAME="todo-mcp"
+    SKILL_NAME="totui-mcp"
     SOURCE_DIR="$(pwd)/skills/$SKILL_NAME"
     TARGET_DIR="$HOME/.config/opencode/skill/$SKILL_NAME"
 
@@ -294,10 +294,10 @@ build-release-binaries:
         fi
 
         # Copy both binaries to release-binaries directory with target suffix
-        cp "target/$target/release/todo${binary_ext}" "release-binaries/todo-$target${binary_ext}"
-        cp "target/$target/release/todo-mcp${binary_ext}" "release-binaries/todo-mcp-$target${binary_ext}"
-        echo "✓ Built: release-binaries/todo-$target${binary_ext}"
-        echo "✓ Built: release-binaries/todo-mcp-$target${binary_ext}"
+        cp "target/$target/release/totui${binary_ext}" "release-binaries/totui-$target${binary_ext}"
+        cp "target/$target/release/totui-mcp${binary_ext}" "release-binaries/totui-mcp-$target${binary_ext}"
+        echo "✓ Built: release-binaries/totui-$target${binary_ext}"
+        echo "✓ Built: release-binaries/totui-mcp-$target${binary_ext}"
         echo ""
     done
 
@@ -332,7 +332,14 @@ _release bump msg="":
 
     NEW_VERSION="$MAJOR.$MINOR.$PATCH"
     sed -i '' "s/^version = \".*\"/version = \"$NEW_VERSION\"/" Cargo.toml
-    echo "✓ Version: $VERSION → $NEW_VERSION"
+    echo "✓ Cargo.toml version: $VERSION → $NEW_VERSION"
+
+    # Update Claude Code marketplace.json versions
+    MARKETPLACE_FILE=".claude-plugin/marketplace.json"
+    if [ -f "$MARKETPLACE_FILE" ]; then
+        sed -i '' "s/\"version\": \"[^\"]*\"/\"version\": \"$NEW_VERSION\"/g" "$MARKETPLACE_FILE"
+        echo "✓ marketplace.json version: $NEW_VERSION"
+    fi
 
     # Update Cargo.lock with new version
     cargo check --quiet
@@ -341,6 +348,9 @@ _release bump msg="":
     echo
     if [[ ! $REPLY =~ ^[Nn]$ ]]; then
         git add Cargo.toml Cargo.lock
+        if [ -f "$MARKETPLACE_FILE" ]; then
+            git add "$MARKETPLACE_FILE"
+        fi
         if [ -n "{{ msg }}" ]; then
             git commit -m "Release v$NEW_VERSION" -m "{{ msg }}"
         else

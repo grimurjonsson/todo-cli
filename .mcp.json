@@ -1,6 +1,6 @@
 {
-  "todo-mcp": {
-    "command": "{{PLUGIN_DIR}}/target/release/todo-mcp",
+  "totui-mcp": {
+    "command": "{{PLUGIN_DIR}}/target/release/totui-mcp",
     "args": []
   }
 }

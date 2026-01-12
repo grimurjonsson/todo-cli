@@ -1,4 +1,4 @@
-# todo-cli
+# to-tui
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Rust](https://img.shields.io/badge/Rust-1.85+-orange.svg)](https://www.rust-lang.org/)
@@ -29,8 +29,8 @@ A terminal-based todo list manager with daily rolling lists, hierarchical tasks,
 
 ```bash
 # Clone the repository
-git clone https://github.com/grimurjonsson/todo-cli.git
-cd todo-cli
+git clone https://github.com/grimurjonsson/to-tui.git
+cd to-tui
 
 # Build and install
 just install
@@ -40,17 +40,17 @@ just install
 ### Using Cargo
 
 ```bash
-cargo install --git https://github.com/grimurjonsson/todo-cli.git
+cargo install --git https://github.com/grimurjonsson/to-tui.git
 ```
 
 ## Usage
 
 ### Terminal UI
 
-Simply run `todo` to launch the interactive terminal interface:
+Simply run `totui` to launch the interactive terminal interface:
 
 ```bash
-todo
+totui
 ```
 
 #### Keybindings
@@ -75,13 +75,13 @@ todo
 
 ```bash
 # Add a todo without opening the TUI
-todo add "Buy groceries"
+totui add "Buy groceries"
 
 # Show today's todos
-todo show
+totui show
 
 # Show todos from a specific date (from archive)
-todo show --date 2024-01-15
+totui show --date 2024-01-15
 ```
 
 ### API Server
@@ -90,16 +90,16 @@ The REST API runs automatically when you start the TUI, or you can manage it man
 
 ```bash
 # Start the API server (default port: 48372)
-todo serve start
+totui serve start
 
 # Check server status
-todo serve status
+totui serve status
 
 # Stop the server
-todo serve stop
+totui serve stop
 
 # Use a different port
-todo serve start --port 3000
+totui serve start --port 3000
 ```
 
 API endpoints:
@@ -121,13 +121,13 @@ The MCP server allows AI assistants like Claude to manage your todos.
 2. Type `/plugin` to open the plugin manager
 3. Go to the "Installed" tab
 4. Look for an option to add a plugin from URL (may be a button or text input)
-5. Enter the GitHub URL: `https://github.com/grimurjonsson/todo-cli.git`
+5. Enter the GitHub URL: `https://github.com/grimurjonsson/to-tui.git`
 6. After installation, download the pre-built binary (one-time setup):
    ```bash
    # Find the installed plugin directory
-   cd ~/.claude/plugins/repos/todo-mcp
+   cd ~/.claude/plugins/repos/totui-mcp
    # Or if installed via marketplace:
-   # cd ~/.claude/plugins/cache/*/todo-mcp/*
+   # cd ~/.claude/plugins/cache/*/totui-mcp/*
 
    # Run the installation script
    bash scripts/install-binary.sh
@@ -147,8 +147,8 @@ The installation script automatically downloads the correct binary for your plat
 
 If you prefer to build from source instead:
 ```bash
-cd ~/.claude/plugins/repos/todo-mcp
-cargo build --release --bin todo-mcp
+cd ~/.claude/plugins/repos/totui-mcp
+cargo build --release --bin totui-mcp
 ```
 
 **Updating the Plugin:**
@@ -166,7 +166,7 @@ For developing the plugin locally:
 just setup-mcp-claude-dev
 ```
 
-This creates a symlink from `~/.claude/plugins/repos/todo-mcp` to your project directory, allowing you to test changes without reinstalling.
+This creates a symlink from `~/.claude/plugins/repos/totui-mcp` to your project directory, allowing you to test changes without reinstalling.
 
 #### Manual MCP Server Setup
 
@@ -174,7 +174,7 @@ For other LLM tools (e.g., Claude Desktop, OpenCode):
 
 ```bash
 # Run the MCP server
-cargo run --release --bin todo-mcp
+cargo run --release --bin totui-mcp
 ```
 
 Configure in your LLM tool:
@@ -182,8 +182,8 @@ Configure in your LLM tool:
 ```json
 {
   "mcp": {
-    "todo-mcp": {
-      "command": ["/path/to/todo-mcp"],
+    "totui-mcp": {
+      "command": ["/path/to/totui-mcp"],
       "enabled": true
     }
   }
@@ -194,13 +194,13 @@ Configure in your LLM tool:
 
 ```bash
 # List available generators
-todo generate --list
+totui generate --list
 
 # Generate todos from a Jira ticket (requires acli and claude CLI)
-todo generate jira PROJ-123
+totui generate jira PROJ-123
 
 # Auto-confirm adding generated todos
-todo generate jira PROJ-123 --yes
+totui generate jira PROJ-123 --yes
 ```
 
 ## Configuration
@@ -208,8 +208,8 @@ todo generate jira PROJ-123 --yes
 Copy the example configuration to get started:
 
 ```bash
-mkdir -p ~/.config/todo-cli
-cp config.example.toml ~/.config/todo-cli/config.toml
+mkdir -p ~/.config/to-tui
+cp config.example.toml ~/.config/to-tui/config.toml
 ```
 
 The config file lets you customize:
@@ -219,9 +219,9 @@ The config file lets you customize:
 
 ## Data Storage
 
-- **Today's todos**: `~/.local/share/todo-cli/dailies/YYYY-MM-DD.md`
-- **Archive database**: `~/.local/share/todo-cli/archive.db`
-- **Configuration**: `~/.config/todo-cli/config.toml`
+- **Today's todos**: `~/.local/share/to-tui/dailies/YYYY-MM-DD.md`
+- **Archive database**: `~/.local/share/to-tui/archive.db`
+- **Configuration**: `~/.config/to-tui/config.toml`
 
 ## Development
 

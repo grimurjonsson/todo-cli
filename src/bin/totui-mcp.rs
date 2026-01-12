@@ -1,6 +1,6 @@
 use anyhow::Result;
 use rmcp::{ServiceExt, transport::stdio};
-use todo_cli::mcp::TodoMcpServer;
+use to_tui::mcp::TodoMcpServer;
 use tracing::info;
 use tracing_subscriber::{EnvFilter, fmt};
 
