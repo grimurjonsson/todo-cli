@@ -84,13 +84,68 @@ if [ -z "$LATEST_TAG" ]; then
 fi
 
 echo -e "Latest version: ${GREEN}${BOLD}$LATEST_TAG${RESET}"
+TARGET_VERSION="${LATEST_TAG#v}"
 echo ""
+
+# Check installed versions of all binaries
+get_installed_version() {
+    local binary_name="$1"
+    local existing_bin
+    existing_bin=$(command -v "$binary_name" 2>/dev/null || true)
+    if [ -n "$existing_bin" ]; then
+        "$existing_bin" --version 2>/dev/null | awk '{print $2}' || true
+    fi
+}
+
+TOTUI_VERSION=$(get_installed_version "totui")
+TOTUI_MCP_VERSION=$(get_installed_version "totui-mcp")
+
+# Show current versions if installed
+if [ -n "$TOTUI_VERSION" ] || [ -n "$TOTUI_MCP_VERSION" ]; then
+    echo -e "${DIM}Currently installed:${RESET}"
+    if [ -n "$TOTUI_VERSION" ]; then
+        if [ "$TOTUI_VERSION" = "$TARGET_VERSION" ]; then
+            echo -e "  totui: ${GREEN}v${TOTUI_VERSION}${RESET} ${DIM}(up to date)${RESET}"
+        else
+            echo -e "  totui: ${YELLOW}v${TOTUI_VERSION}${RESET} ${DIM}(update available)${RESET}"
+        fi
+    fi
+    if [ -n "$TOTUI_MCP_VERSION" ]; then
+        if [ "$TOTUI_MCP_VERSION" = "$TARGET_VERSION" ]; then
+            echo -e "  totui-mcp: ${GREEN}v${TOTUI_MCP_VERSION}${RESET} ${DIM}(up to date)${RESET}"
+        else
+            echo -e "  totui-mcp: ${YELLOW}v${TOTUI_MCP_VERSION}${RESET} ${DIM}(update available)${RESET}"
+        fi
+    fi
+    echo ""
+fi
+
+# Check if all binaries are already up to date
+if [ "$TOTUI_VERSION" = "$TARGET_VERSION" ] && [ "$TOTUI_MCP_VERSION" = "$TARGET_VERSION" ]; then
+    echo -e "${GREEN}${BOLD}✓${RESET} All binaries are already up to date!"
+    echo ""
+    echo -e "Documentation: ${BLUE}https://github.com/${REPO}${RESET}"
+    echo ""
+    exit 0
+fi
 
 # Ask what to install
 echo -e "${BOLD}What would you like to install?${RESET}"
 echo ""
-echo -e "  ${CYAN}1)${RESET} totui only ${DIM}(TUI app)${RESET}"
-echo -e "  ${CYAN}2)${RESET} totui-mcp only ${DIM}(MCP server for Claude/LLMs)${RESET}"
+
+# Build menu options based on what needs updating
+if [ "$TOTUI_VERSION" = "$TARGET_VERSION" ]; then
+    echo -e "  ${DIM}1) totui only (already up to date)${RESET}"
+else
+    echo -e "  ${CYAN}1)${RESET} totui only ${DIM}(TUI app)${RESET}"
+fi
+
+if [ "$TOTUI_MCP_VERSION" = "$TARGET_VERSION" ]; then
+    echo -e "  ${DIM}2) totui-mcp only (already up to date)${RESET}"
+else
+    echo -e "  ${CYAN}2)${RESET} totui-mcp only ${DIM}(MCP server for Claude/LLMs)${RESET}"
+fi
+
 echo -e "  ${CYAN}3)${RESET} Both totui and totui-mcp"
 echo ""
 
@@ -109,6 +164,26 @@ case "$CHOICE" in
     *) BINARIES=("totui" "totui-mcp") ;;
 esac
 
+# Filter out already up-to-date binaries
+BINARIES_TO_INSTALL=()
+for BINARY_NAME in "${BINARIES[@]}"; do
+    if [ "$BINARY_NAME" = "totui" ] && [ "$TOTUI_VERSION" = "$TARGET_VERSION" ]; then
+        echo -e "${GREEN}${BOLD}✓${RESET} ${BOLD}totui${RESET} ${DIM}v${TARGET_VERSION}${RESET} already installed ${DIM}(skipping)${RESET}"
+    elif [ "$BINARY_NAME" = "totui-mcp" ] && [ "$TOTUI_MCP_VERSION" = "$TARGET_VERSION" ]; then
+        echo -e "${GREEN}${BOLD}✓${RESET} ${BOLD}totui-mcp${RESET} ${DIM}v${TARGET_VERSION}${RESET} already installed ${DIM}(skipping)${RESET}"
+    else
+        BINARIES_TO_INSTALL+=("$BINARY_NAME")
+    fi
+done
+
+if [ ${#BINARIES_TO_INSTALL[@]} -eq 0 ]; then
+    echo ""
+    echo -e "${GREEN}${BOLD}✓${RESET} Nothing to install - all selected binaries are up to date!"
+    echo ""
+    exit 0
+fi
+
+BINARIES=("${BINARIES_TO_INSTALL[@]}")
 echo ""
 
 # Check for existing installations in different locations
