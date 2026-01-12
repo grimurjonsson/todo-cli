@@ -358,4 +358,12 @@ _release bump msg="":
         fi
         git tag "v$NEW_VERSION"
         echo "✓ Created commit and tag v$NEW_VERSION"
+
+        read -p "Push to remote? [Y/n] " -n 1 -r
+        echo
+        if [[ ! $REPLY =~ ^[Nn]$ ]]; then
+            git push origin main
+            git push origin "v$NEW_VERSION"
+            echo "✓ Pushed commit and tag to origin"
+        fi
     fi
