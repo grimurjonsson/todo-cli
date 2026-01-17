@@ -19,15 +19,15 @@ Add clipboard support to to-tui, enabling users to copy todo text to the system 
   2. Status bar shows "Copied: [todo text]" confirmation after successful copy
   3. Status bar shows error message when clipboard unavailable
   4. Copied text is plain text only (no checkbox, no markdown formatting)
-**Research**: Unlikely (research completed, patterns established)
-**Plans**: TBD
+**Research**: Complete (see .planning/research/)
+**Plans**: 2 plans in 2 waves
 
 Plans:
-- [ ] 01-01: Add arboard dependency and clipboard module
-- [ ] 01-02: Implement copy action and keybinding
+- [ ] 01-01: Add arboard dependency and clipboard module (Wave 1)
+- [ ] 01-02: Implement copy action and keybinding (Wave 2)
 
 ## Progress
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Clipboard Support | 0/2 | Not started | - |
+| 1. Clipboard Support | 0/2 | Planned | - |
