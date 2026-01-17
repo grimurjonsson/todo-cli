@@ -5,33 +5,33 @@
 See: .planning/PROJECT.md (updated 2026-01-17)
 
 **Core value:** Fast, keyboard-driven todo management that lives in the terminal and integrates with the tools I already use.
-**Current focus:** Phase 1 — Clipboard Support
+**Current focus:** Phase 1 complete
 
 ## Current Position
 
 Phase: 1 of 1 (Clipboard Support)
-Plan: 01-01 complete, 01-02 ready to execute
-Status: In progress (1/2 plans complete)
-Last activity: 2026-01-17 — Completed 01-01-PLAN.md
+Plan: 2 of 2 complete
+Status: Phase complete
+Last activity: 2026-01-17 — Completed 01-02-PLAN.md
 
-Progress: █████░░░░░ 50%
+Progress: ██████████ 100%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 1
-- Average duration: 1 min
-- Total execution time: 0.02 hours
+- Total plans completed: 2
+- Average duration: 1.5 min
+- Total execution time: 0.05 hours
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| 01-clipboard-support | 1/2 | 1 min | 1 min |
+| 01-clipboard-support | 2/2 | 3 min | 1.5 min |
 
 **Recent Trend:**
-- Last 5 plans: 01-01 (1 min)
-- Trend: Starting
+- Last 5 plans: 01-01 (1 min), 01-02 (2 min)
+- Trend: Consistent
 
 ## Accumulated Context
 
@@ -42,17 +42,19 @@ Recent decisions affecting current work:
 
 - Copy text only (no checkbox/hierarchy) — user preference
 - Use arboard 3.6 with wayland-data-control feature for Linux Wayland support (01-01)
+- Use y key (vim yank) rather than Ctrl-C to avoid terminal interrupt conflicts (01-02)
+- Truncate status bar display to 40 chars to prevent overflow (01-02)
 
 ### Pending Todos
 
-None yet.
+None.
 
 ### Blockers/Concerns
 
-None yet.
+None.
 
 ## Session Continuity
 
-Last session: 2026-01-17T20:25:55Z
-Stopped at: Completed 01-01-PLAN.md
+Last session: 2026-01-17T20:28:59Z
+Stopped at: Completed 01-02-PLAN.md (Phase 1 complete)
 Resume file: None
