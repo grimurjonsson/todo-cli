@@ -33,9 +33,9 @@ impl TodoState {
 
     pub fn cycle(&self) -> Self {
         match self {
-            Self::Empty => Self::InProgress,
-            Self::InProgress => Self::Checked,
-            Self::Checked => Self::Question,
+            Self::Empty => Self::Checked,
+            Self::Checked => Self::InProgress,
+            Self::InProgress => Self::Question,
             Self::Question => Self::Exclamation,
             Self::Exclamation => Self::Empty,
         }
@@ -99,9 +99,9 @@ mod tests {
 
     #[test]
     fn test_cycle() {
-        assert_eq!(TodoState::Empty.cycle(), TodoState::InProgress);
-        assert_eq!(TodoState::InProgress.cycle(), TodoState::Checked);
-        assert_eq!(TodoState::Checked.cycle(), TodoState::Question);
+        assert_eq!(TodoState::Empty.cycle(), TodoState::Checked);
+        assert_eq!(TodoState::Checked.cycle(), TodoState::InProgress);
+        assert_eq!(TodoState::InProgress.cycle(), TodoState::Question);
         assert_eq!(TodoState::Question.cycle(), TodoState::Exclamation);
         assert_eq!(TodoState::Exclamation.cycle(), TodoState::Empty);
     }

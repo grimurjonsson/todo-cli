@@ -182,10 +182,10 @@ mod tests {
         assert_eq!(item.state, TodoState::Empty);
 
         item.cycle_state();
-        assert_eq!(item.state, TodoState::InProgress);
+        assert_eq!(item.state, TodoState::Checked);
 
         item.cycle_state();
-        assert_eq!(item.state, TodoState::Checked);
+        assert_eq!(item.state, TodoState::InProgress);
 
         item.cycle_state();
         assert_eq!(item.state, TodoState::Question);

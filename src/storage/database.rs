@@ -919,11 +919,11 @@ mod tests {
         assert_eq!(loaded[0].state, TodoState::Checked);
 
         // Change to different state
-        list.items[0].cycle_state(); // Goes to Question
+        list.items[0].cycle_state(); // Goes to InProgress
         save_to_test_db(&conn, &list);
         let loaded = load_from_test_db(&conn, date);
 
-        assert_eq!(loaded[0].state, TodoState::Question);
+        assert_eq!(loaded[0].state, TodoState::InProgress);
     }
 
     #[test]

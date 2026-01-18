@@ -88,13 +88,7 @@ pub fn render(f: &mut Frame, state: &mut AppState, area: Rect) {
 
         let is_in_selection = state.is_selected(idx) && state.mode == Mode::Visual;
 
-        // For prefix, we use foreground color when not in selection
-        let prefix_style = compute_item_style(
-            TodoState::Empty, // Use Empty to get foreground color for prefix
-            &state.theme,
-            is_in_selection,
-        );
-
+        // Use same style for entire line so highlight is uniform
         let content_style = compute_item_style(item.state, &state.theme, is_in_selection);
 
         let content_max_width = available_width.saturating_sub(prefix_width + checkbox_width);
@@ -127,10 +121,15 @@ pub fn render(f: &mut Frame, state: &mut AppState, area: Rect) {
                     truncate_with_ellipsis(&content_with_due, available_for_content);
                 let display_text = format!("{truncated_content}{collapse_indicator}");
 
+                // Pad to full width for proper highlight
+                let current_width = prefix_width + checkbox_width + display_text.width();
+                let padding = " ".repeat(available_width.saturating_sub(current_width));
+
                 let lines = vec![Line::from(vec![
-                    Span::styled(prefix.clone(), prefix_style),
+                    Span::styled(prefix.clone(), content_style),
                     Span::styled(checkbox_with_space.clone(), content_style),
                     Span::styled(display_text, content_style),
+                    Span::styled(padding, content_style),
                 ])];
                 items.push(ListItem::new(lines));
             } else {
@@ -140,15 +139,25 @@ pub fn render(f: &mut Frame, state: &mut AppState, area: Rect) {
                 let mut lines: Vec<Line> = Vec::new();
                 for (i, line_text) in wrapped_lines.iter().enumerate() {
                     if i == 0 {
+                        // Pad to full width for proper highlight
+                        let current_width = prefix_width + checkbox_width + line_text.width();
+                        let padding = " ".repeat(available_width.saturating_sub(current_width));
+
                         lines.push(Line::from(vec![
-                            Span::styled(prefix.clone(), prefix_style),
+                            Span::styled(prefix.clone(), content_style),
                             Span::styled(checkbox_with_space.clone(), content_style),
                             Span::styled(line_text.clone(), content_style),
+                            Span::styled(padding, content_style),
                         ]));
                     } else {
+                        // Pad continuation lines to full width
+                        let current_width = continuation_indent.width() + line_text.width();
+                        let padding = " ".repeat(available_width.saturating_sub(current_width));
+
                         lines.push(Line::from(vec![
-                            Span::styled(continuation_indent.clone(), prefix_style),
+                            Span::styled(continuation_indent.clone(), content_style),
                             Span::styled(line_text.clone(), content_style),
+                            Span::styled(padding, content_style),
                         ]));
                     }
                 }
