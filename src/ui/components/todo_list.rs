@@ -324,9 +324,11 @@ pub fn render(f: &mut Frame, state: &mut AppState, area: Rect) {
             .begin_symbol(Some("↑"))
             .end_symbol(Some("↓"));
 
+        // Use selected index for scrollbar position so it reflects cursor location
+        let scrollbar_position = state.list_state.selected().unwrap_or(0);
         let mut scrollbar_state = ScrollbarState::new(total_visible_items)
             .viewport_content_length(viewport_height)
-            .position(state.list_state.offset());
+            .position(scrollbar_position);
 
         f.render_stateful_widget(
             scrollbar,
